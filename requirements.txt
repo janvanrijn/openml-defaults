@@ -1,5 +1,7 @@
+Cython
 matplotlib
 numpy
 pandas
+pulp
 scikit-learn
 scipy
