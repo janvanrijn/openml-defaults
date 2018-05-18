@@ -1,4 +1,5 @@
 Cython
+feather
 matplotlib
 numpy
 pandas
