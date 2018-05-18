@@ -2,11 +2,7 @@ import argparse
 import numpy as np
 import feather
 import os
-import pandas as pd
 import pulp
-
-from typing import List
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -44,7 +40,7 @@ def run(args):
     mip_optimizer = pulp.LpProblem('ComplementaryConfigurationSelector', pulp.LpMinimize)
 
     config_identifier_variables = list()
-    for config_idx in range(len(df)):
+    for config_idx in range(num_configurations):
         current_dataset_min_score = pulp.LpVariable(str(df.index.tolist()[config_idx]), cat=pulp.LpBinary)
         config_identifier_variables.append(current_dataset_min_score)
     mip_optimizer += pulp.lpSum(config_identifier_variables) == args.num_defaults
@@ -58,7 +54,7 @@ def run(args):
         auxilary_variables = list()
         for config_idx, civ in enumerate(config_identifier_variables):
             current_auxilary = pulp.LpVariable('task_%d_conf_%d' % (task_idx, config_idx), cat=pulp.LpBinary)
-            mip_optimizer += current_dataset_min_score <= (df.iloc[config_idx][task_name] * config_identifier_variables[config_idx]) - (big_m * current_auxilary)
+            mip_optimizer += current_dataset_min_score >= (df.iloc[config_idx][task_name] * config_identifier_variables[config_idx]) - (big_m * current_auxilary)
             mip_optimizer += 0 <= 2 - config_identifier_variables[config_idx] - current_auxilary <= 1
             auxilary_variables.append(current_auxilary)
         mip_optimizer += pulp.lpSum(auxilary_variables) == num_configurations - 1
