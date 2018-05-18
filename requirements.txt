@@ -1,5 +1,5 @@
 Cython
-feather
+feather-format
 matplotlib
 numpy
 pandas
