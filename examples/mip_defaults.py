@@ -9,15 +9,15 @@ import time
 
 from typing import List, Tuple
 
-
+# sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
                         default=os.path.expanduser('~') + '/data/openml-defaults/mlr.classif.rpart.feather')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--resized_grid_size', type=int, default=2)
-    parser.add_argument('--restricted_num_tasks', type=int, default=1)
+    parser.add_argument('--resized_grid_size', type=int, default=5)
+    parser.add_argument('--restricted_num_tasks', type=int, default=10)
     parser.add_argument('--num_defaults', type=int, default=1)
     return parser.parse_args()
 
@@ -87,7 +87,7 @@ def run(args):
     start_time = time.time()
 
     df = feather.read_dataframe(args.dataset_path)
-
+    print(df.shape)
     if args.resized_grid_size is not None:
         df = reshape_configs(df, args.params, args.resized_grid_size)
 
