@@ -13,12 +13,12 @@ from typing import List, Tuple
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/mlr.classif.rpart.feather')
-    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
+                        default=os.path.expanduser('~') + '/data/openmldefaults/mlr.classif.rpart.feather')
+    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openmldefaults')
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=5)
-    parser.add_argument('--restricted_num_tasks', type=int, default=10)
-    parser.add_argument('--num_defaults', type=int, default=1)
+    parser.add_argument('--restricted_num_tasks', type=int, default=5)
+    parser.add_argument('--num_defaults', type=int, default=2)
     return parser.parse_args()
 
 
@@ -99,11 +99,13 @@ def run(args):
         df = df.iloc[:, 0:args.restricted_num_tasks]
 
     mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults, df.shape[1])
-
-    experiment_dir = 'c%d_t%d_d%d' % (args.resized_grid_size, args.restricted_num_tasks, args.num_defaults)
+    if args.restricted_num_tasks is not None:
+        experiment_dir = 'c%d_t%d_d%d' % (args.resized_grid_size, args.restricted_num_tasks, args.num_defaults)
+    else:
+        experiment_dir = 'c%d_tAll_d%d' % (args.resized_grid_size, args.num_defaults)
     os.makedirs(os.path.join(args.output_dir, experiment_dir), exist_ok=True)
     mip_optimizer.writeLP(os.path.join(args.output_dir, experiment_dir, 'minimize_multi_defaults.lp'))
-    mip_optimizer.solve()
+    mip_optimizer.solve(solver=pulp.GLPK_CMD())
     run_time = time.time() - start_time
 
     # The status of the solution is printed to the screen
