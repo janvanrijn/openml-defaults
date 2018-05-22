@@ -55,7 +55,7 @@ def run(args):
     runtime = time.time() - start_time
     if process.returncode != 0:
         raise ValueError('Process terminated with non-zero exit code. ')
-    print('Runtime: %d seconds' %runtime)
+    print('Runtime: %d seconds' % runtime)
 
     for idx, line in enumerate(out.split("\n")):
         try:
@@ -66,8 +66,8 @@ def run(args):
     print(solution)
     selected_defaults = [df.index[idx] for idx in solution['solution']]
     sum_of_scores = sum(openmldefaults.utils.selected_set(df, selected_defaults))
-    assert sum_of_scores == solution['score'], 'Sum of scores does not equal score of solution: %f vs %f' % \
-                                               (sum_of_scores, solution['score'])
+    diff = abs(sum_of_scores - solution['score'])
+    assert diff < 0.00001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, solution['score'])
 
 
 if __name__ == '__main__':

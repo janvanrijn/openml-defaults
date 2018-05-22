@@ -23,13 +23,19 @@ int const MAX_NUM_DEFAULTS = 10;
 float current_best_solution;
 
 
-void print_subset(int num_defaults, int current_subset[MAX_NUM_DEFAULTS]) {
-  for (int i = 0; i < num_defaults - 1; ++i) {
-    cout << current_subset[i] << ",";
+void print_array(int array_size, int array[]) {
+  for (int i = 0; i < array_size - 1; ++i) {
+    cout << array[i] << ",";
   }
-  cout << current_subset[num_defaults-1];
+  cout << array[array_size-1];
 }
 
+void print_array_d(int array_size, double array[]) {
+  for (int i = 0; i < array_size - 1; ++i) {
+    cout << array[i] << ",";
+  }
+  cout << array[array_size-1];
+}
 
 double evaluate_subset(int num_tasks, int num_defaults, 
                        double performance[MAX_NUM_CONFIGS][MAX_NUM_TASKS],
@@ -38,7 +44,7 @@ double evaluate_subset(int num_tasks, int num_defaults,
   for (int i = 0; i < num_tasks; ++i) {
     double current_task_loss = MAX_LOSS;
     for (int j = 0; j < num_defaults; ++j) {
-      double current_config_score = performance[i][current_subset[j]];
+      double current_config_score = performance[current_subset[j]][i];
       if (current_config_score < current_task_loss) {
         current_task_loss = current_config_score;
       }
@@ -58,9 +64,17 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
     
     if (current_score < current_best_solution) {
       current_best_solution = current_score;
-      cout << "{ \"solution\": [";
-      print_subset(num_defaults, current_subset);
-      cout << "], \"score\": " << current_score << "}" << endl;
+      cout << "{";
+      cout << "\"solution\": [";
+      print_array(num_defaults, current_subset);
+      cout << "], ";
+      cout << "\"score\": " << current_score;
+      //for (int i = 0; i < num_defaults; ++i) {
+      //  cout << ", \"losses_config_" << current_subset[i] << "\": [";
+      //  print_array_d(num_tasks, performance[current_subset[i]]);
+      //  cout << "]";
+      //}
+      cout << "}" << endl;
     }
   } else {
     int start_index = 0;
@@ -101,7 +115,7 @@ int main() {
   }
   
   for (int i = 0; i < num_configs; ++i) {
-    for (int j = 0; j < num_configs; ++j) {
+    for (int j = 0; j < num_tasks; ++j) {
       cin >> performance[i][j];
     }
   }
