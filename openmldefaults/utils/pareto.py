@@ -4,9 +4,11 @@ from typing import Callable
 
 # fn from: http://code.activestate.com/recipes/578287-multidimensional-pareto-front/
 def simple_cull(original_frame: pd.DataFrame, dominates: Callable):
-    pareto_frame = pd.DataFrame(data=None, columns=original_frame.columns)
-    dominated_frame = pd.DataFrame(data=None, columns=original_frame.columns)
+    # copies the frame. contains the same number of rows (filled with na's) should be removed later
+    pareto_frame = pd.DataFrame(data=None, columns=original_frame.columns, index=original_frame.index)
+    dominated_frame = pd.DataFrame(data=None, columns=original_frame.columns, index=original_frame.index)
     candidate_row_nr = 0
+
     while True:
         # obtain the current row
         candidate_key = original_frame.index[candidate_row_nr]
@@ -37,4 +39,4 @@ def simple_cull(original_frame: pd.DataFrame, dominates: Callable):
 
         if len(original_frame) == 0:
             break
-    return pareto_frame, dominated_frame
+    return pareto_frame.dropna(), dominated_frame.dropna()

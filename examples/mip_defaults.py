@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import feather
+import openmldefaults
 import os
 import pandas as pd
 import pickle
@@ -13,7 +14,7 @@ from typing import List, Tuple
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openmldefaults/mlr.classif.rpart.feather')
+                        default=os.path.expanduser('~') + '/data/openml-defaults/mlr.classif.rpart.feather')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openmldefaults')
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=5)
@@ -83,11 +84,16 @@ def get_mixed_integer_formulation(df, num_defaults, num_tasks):
     return mip_optimizer
 
 
+def dominates(dominater, dominated):
+    return sum([dominater[x] <= dominated[x] for x in range(len(dominater))]) == len(dominater)
+
+
 def run(args):
     start_time = time.time()
 
     df = feather.read_dataframe(args.dataset_path)
     print(df.shape)
+
     if args.resized_grid_size is not None:
         df = reshape_configs(df, args.params, args.resized_grid_size)
 
@@ -98,6 +104,8 @@ def run(args):
         # subsample num tasks
         df = df.iloc[:, 0:args.restricted_num_tasks]
 
+    df, dominated = openmldefaults.utils.simple_cull(df, dominates)
+    print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
     mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults, df.shape[1])
     if args.restricted_num_tasks is not None:
         experiment_dir = 'c%d_t%d_d%d' % (args.resized_grid_size, args.restricted_num_tasks, args.num_defaults)
