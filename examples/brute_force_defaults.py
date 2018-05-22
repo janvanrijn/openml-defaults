@@ -24,7 +24,7 @@ def parse_args():
 
 def run(args):
     df = feather.read_dataframe(args.dataset_path)
-    print(df.shape)
+    print('Original data frame dimensions:', df.shape)
 
     if not os.path.isfile(args.c_executable):
         raise ValueError('Please compile C program first')
@@ -38,6 +38,7 @@ def run(args):
     if args.restricted_num_tasks is not None:
         # subsample num tasks
         df = df.iloc[:, 0:args.restricted_num_tasks]
+    print('Reshaped data frame dimensions:', df.shape)
 
     df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
     print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
@@ -65,6 +66,18 @@ def run(args):
 
     print(solution)
     selected_defaults = [df.index[idx] for idx in solution['solution']]
+
+    results_dict = {
+        'objective': solution['score'],
+        'run_time': runtime,
+        'defaults': selected_defaults
+    }
+    solver_dir = 'cpp_bruteforce'
+    experiment_dir = openmldefaults.utils.get_experiment_dir(args)
+    os.makedirs(os.path.join(args.output_dir, solver_dir, experiment_dir), exist_ok=True)
+    with open(os.path.join(args.output_dir, solver_dir, experiment_dir, 'results.pkl'), 'wb') as fp:
+        pickle.dump(results_dict, fp)
+
     sum_of_scores = sum(openmldefaults.utils.selected_set(df, selected_defaults))
     diff = abs(sum_of_scores - solution['score'])
     assert diff < 0.00001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, solution['score'])

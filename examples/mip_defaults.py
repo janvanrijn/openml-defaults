@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument('--resized_grid_size', type=int, default=5)
     parser.add_argument('--restricted_num_tasks', type=int, default=5)
     parser.add_argument('--num_defaults', type=int, default=2)
+    parser.add_argument('--solver', type=str, default='GLPK_CMD')
     return parser.parse_args()
 
 
@@ -79,13 +80,12 @@ def run(args):
     df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
     print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
     mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults, df.shape[1])
-    if args.restricted_num_tasks is not None:
-        experiment_dir = 'c%d_t%d_d%d' % (args.resized_grid_size, args.restricted_num_tasks, args.num_defaults)
-    else:
-        experiment_dir = 'c%d_tAll_d%d' % (args.resized_grid_size, args.num_defaults)
-    os.makedirs(os.path.join(args.output_dir, experiment_dir), exist_ok=True)
-    mip_optimizer.writeLP(os.path.join(args.output_dir, experiment_dir, 'minimize_multi_defaults.lp'))
-    mip_optimizer.solve(solver=pulp.GLPK_CMD())
+
+    solver_dir = 'mip_%s' % args.solver
+    experiment_dir = openmldefaults.utils.get_experiment_dir(args)
+    os.makedirs(os.path.join(args.output_dir, solver_dir, experiment_dir), exist_ok=True)
+    mip_optimizer.writeLP(os.path.join(args.output_dir, solver_dir, experiment_dir, 'minimize_multi_defaults.lp'))
+    mip_optimizer.solve(solver=getattr(pulp, args.solver)())
     run_time = time.time() - start_time
 
     # The status of the solution is printed to the screen
@@ -107,7 +107,7 @@ def run(args):
         # The optimised objective function value is printed to the screen
         result_dict['defaults'] = defaults
     print(result_dict)
-    with open(os.path.join(args.output_dir, experiment_dir, 'results.pkl'), 'wb') as fp:
+    with open(os.path.join(args.output_dir, solver_dir, experiment_dir, 'results.pkl'), 'wb') as fp:
         pickle.dump(result_dict, fp)
 
     if result_dict['status'] == 'Optimal':
