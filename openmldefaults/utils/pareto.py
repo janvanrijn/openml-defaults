@@ -2,6 +2,10 @@ import pandas as pd
 from typing import Callable
 
 
+def dominates_min(dominater, dominated):
+    return sum([dominater[x] <= dominated[x] for x in range(len(dominater))]) == len(dominater)
+
+
 # fn from: http://code.activestate.com/recipes/578287-multidimensional-pareto-front/
 def simple_cull(original_frame: pd.DataFrame, dominates: Callable):
     # copies the frame. contains the same number of rows (filled with na's) should be removed later

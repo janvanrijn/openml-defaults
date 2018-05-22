@@ -1,14 +1,11 @@
 import argparse
-import numpy as np
 import feather
 import openmldefaults
 import os
-import pandas as pd
 import pickle
 import pulp
 import time
 
-from typing import List, Tuple
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
 def parse_args():
@@ -21,27 +18,6 @@ def parse_args():
     parser.add_argument('--restricted_num_tasks', type=int, default=5)
     parser.add_argument('--num_defaults', type=int, default=2)
     return parser.parse_args()
-
-
-def selected_set(df: pd.DataFrame, defaults: List[Tuple]):
-    # filters out only the algorithms that we have in the 'set of defaults'
-    df = df.loc[defaults]
-    # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
-    # then we take the median of this
-    return df.min(axis=0)
-
-
-def reshape_configs(df, params, resized_grid_size):
-    # subsample the hyperparameter grid
-    for param in params:
-        unique = np.array(df[param].unique())
-        if len(unique) > resized_grid_size:
-            interval = int(np.ceil(len(unique) / resized_grid_size))
-            resized = unique[0::interval]
-            assert len(resized) <= resized_grid_size, 'Param %s, originally %d, new size: %d' % (
-            param, len(unique), len(resized))
-            df = df.loc[df[param].isin(resized)]
-    return df
 
 
 def get_mixed_integer_formulation(df, num_defaults, num_tasks):
@@ -84,10 +60,6 @@ def get_mixed_integer_formulation(df, num_defaults, num_tasks):
     return mip_optimizer
 
 
-def dominates(dominater, dominated):
-    return sum([dominater[x] <= dominated[x] for x in range(len(dominater))]) == len(dominater)
-
-
 def run(args):
     start_time = time.time()
 
@@ -95,7 +67,7 @@ def run(args):
     print(df.shape)
 
     if args.resized_grid_size is not None:
-        df = reshape_configs(df, args.params, args.resized_grid_size)
+        df = openmldefaults.utils.reshape_configs(df, args.params, args.resized_grid_size)
 
     # always set the index
     df = df.set_index(args.params)
@@ -104,7 +76,7 @@ def run(args):
         # subsample num tasks
         df = df.iloc[:, 0:args.restricted_num_tasks]
 
-    df, dominated = openmldefaults.utils.simple_cull(df, dominates)
+    df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
     print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
     mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults, df.shape[1])
     if args.restricted_num_tasks is not None:
@@ -139,7 +111,7 @@ def run(args):
         pickle.dump(result_dict, fp)
 
     if result_dict['status'] == 'Optimal':
-        result_frame = selected_set(df, defaults)
+        result_frame = openmldefaults.utils.selected_set(df, defaults)
         diff = sum(result_frame) - result_dict['objective']
         assert abs(diff) < 0.00001, '%f vs %f' % (sum(result_frame), result_dict['objective'])
 

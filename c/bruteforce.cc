@@ -57,10 +57,10 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
                                            current_subset);
     
     if (current_score < current_best_solution) {
-      cout << "Found new solution: " << endl;
       current_best_solution = current_score;
+      cout << "{ \"solution\": [";
       print_subset(num_defaults, current_subset);
-      cout << endl << current_score << endl;
+      cout << "], \"score\": " << current_score << "}" << endl;
     }
   } else {
     int start_index = 0;
