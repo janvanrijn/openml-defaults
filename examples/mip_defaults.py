@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
                         default=os.path.expanduser('~') + '/data/openml-defaults/mlr.classif.rpart.feather')
-    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openmldefaults')
+    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=5)
     parser.add_argument('--restricted_num_tasks', type=int, default=5)
