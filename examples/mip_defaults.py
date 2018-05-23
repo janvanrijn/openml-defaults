@@ -30,8 +30,8 @@ def get_mixed_integer_formulation(df, num_defaults, num_tasks):
     # creates a variable for each configuration (var = 1 iff it was selected to the default set)
     config_identifier_variables = list()
     for config_idx in range(num_configurations):
-        current_dataset_min_score = pulp.LpVariable('config_' + str(df.index.tolist()[config_idx]), cat=pulp.LpBinary)
-        config_identifier_variables.append(current_dataset_min_score)
+        config_identifier = pulp.LpVariable('config_' + str(df.index.tolist()[config_idx]), cat=pulp.LpBinary)
+        config_identifier_variables.append(config_identifier)
     # ensures that only the required number of defaults is chosen
     mip_optimizer += pulp.lpSum(config_identifier_variables) == num_defaults
 
@@ -76,9 +76,10 @@ def run(args):
     if args.restricted_num_tasks is not None:
         # subsample num tasks
         df = df.iloc[:, 0:args.restricted_num_tasks]
+    print('Reshaped data frame dimensions:', df.shape)
 
-    df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
-    print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
+    #df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
+    #print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
     mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults, df.shape[1])
 
     solver_dir = 'mip_%s' % args.solver
