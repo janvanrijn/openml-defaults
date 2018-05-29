@@ -1,6 +1,7 @@
 import argparse
 import feather
 import json
+import numpy as np
 import openmldefaults
 import os
 import pickle
@@ -12,25 +13,37 @@ import time
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/mlr.classif.rpart.feather')
+                        default=os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--resized_grid_size', type=int, default=5)
+    parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=2)
+    parser.add_argument('--num_defaults', type=int, default=5)
     return parser.parse_args()
+
+
+def print_columns(df, params):
+    for param in params:
+        unique = np.array(df[param].unique())
+        print(openmldefaults.utils.get_time(), '%s unique values: %s (%d)' % (param, unique, len(unique)))
 
 
 def run(args):
     df = feather.read_dataframe(args.dataset_path)
     print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)
 
+    for param in args.params:
+        if param not in df.columns.values:
+            raise ValueError('Param column not found. Columns %s, illegal: %s' % (df.columns.values, param))
+
     if not os.path.isfile(args.c_executable):
         raise ValueError('Please compile C program first')
 
     if args.resized_grid_size is not None:
         df = openmldefaults.utils.reshape_configs(df, args.params, args.resized_grid_size)
+
+    print_columns(df, args.params)
 
     # always set the index
     df = df.set_index(args.params)
@@ -88,7 +101,7 @@ def run(args):
 
     sum_of_scores = sum(openmldefaults.utils.selected_set(df, selected_defaults))
     diff = abs(sum_of_scores - solution['score'])
-    assert diff < 0.00001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, solution['score'])
+    assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, solution['score'])
 
 
 if __name__ == '__main__':
