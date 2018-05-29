@@ -16,15 +16,15 @@ def parse_args():
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--resized_grid_size', type=int, default=10)
+    parser.add_argument('--resized_grid_size', type=int, default=5)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=5)
+    parser.add_argument('--num_defaults', type=int, default=2)
     return parser.parse_args()
 
 
 def run(args):
     df = feather.read_dataframe(args.dataset_path)
-    print('Original data frame dimensions:', df.shape)
+    print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)
 
     if not os.path.isfile(args.c_executable):
         raise ValueError('Please compile C program first')
@@ -38,17 +38,18 @@ def run(args):
     if args.restricted_num_tasks is not None:
         # subsample num tasks
         df = df.iloc[:, 0:args.restricted_num_tasks]
-    print('Reshaped data frame dimensions:', df.shape)
+    print(openmldefaults.utils.get_time(), 'Reshaped data frame dimensions:', df.shape)
 
     # pareto front
     df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
-    print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
+    print(openmldefaults.utils.get_time(), 'Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
 
     # sort configurations by 'good ones'
     df['sum_of_columns'] = df.apply(lambda row: sum(row), axis=1)
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
+    print(openmldefaults.utils.get_time(), 'Started c program')
     num_configs, num_tasks = df.shape
     process = subprocess.Popen([args.c_executable], stdout=subprocess.PIPE,
                                stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
@@ -62,7 +63,7 @@ def run(args):
     runtime = time.time() - start_time
     if process.returncode != 0:
         raise ValueError('Process terminated with non-zero exit code. ')
-    print('Runtime: %d seconds' % runtime)
+    print(openmldefaults.utils.get_time(), 'Runtime: %d seconds' % runtime)
 
     for idx, line in enumerate(out.split("\n")):
         try:
@@ -70,7 +71,7 @@ def run(args):
         except json.decoder.JSONDecodeError:
             pass
 
-    print(solution)
+    print(openmldefaults.utils.get_time(), solution)
     selected_defaults = [df.index[idx] for idx in solution['solution']]
 
     results_dict = {
@@ -79,9 +80,10 @@ def run(args):
         'defaults': selected_defaults
     }
     solver_dir = 'cpp_bruteforce'
+    dataset_dir = os.path.basename(args.dataset_path)
     experiment_dir = openmldefaults.utils.get_experiment_dir(args)
-    os.makedirs(os.path.join(args.output_dir, solver_dir, experiment_dir), exist_ok=True)
-    with open(os.path.join(args.output_dir, solver_dir, experiment_dir, 'results.pkl'), 'wb') as fp:
+    os.makedirs(os.path.join(args.output_dir, dataset_dir, solver_dir, experiment_dir), exist_ok=True)
+    with open(os.path.join(args.output_dir, dataset_dir, solver_dir, experiment_dir, 'results.pkl'), 'wb') as fp:
         pickle.dump(results_dict, fp)
 
     sum_of_scores = sum(openmldefaults.utils.selected_set(df, selected_defaults))
