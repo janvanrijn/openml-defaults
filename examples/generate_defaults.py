@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=2)
+    parser.add_argument('--num_defaults', type=int, default=8)
     return parser.parse_args()
 
 
