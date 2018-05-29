@@ -59,7 +59,7 @@ def run(args):
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
-    models = [openmldefaults.models.CppDefaults(args.c_executable)]
+    models = [openmldefaults.models.CppDefaults(args.c_executable), openmldefaults.models.GreedyDefaults()]
 
     results = {}
 
@@ -79,8 +79,8 @@ def run(args):
         with open(experiment_file, 'wb') as fp:
             pickle.dump(results_dict, fp)
 
-        sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['selected_defaults']))
-        diff = abs(sum_of_scores - results_dict['score'])
+        sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['defaults']))
+        diff = abs(sum_of_scores - results_dict['objective'])
         assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, results_dict['score'])
 
         results[model.name] = results_dict
