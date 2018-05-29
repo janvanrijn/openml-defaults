@@ -11,6 +11,7 @@
       double (the score of configuration c on task t)
 */
 
+#include <cmath>
 #include <iostream>
 
 using namespace std;
@@ -20,7 +21,11 @@ int const MAX_NUM_TASKS = 30;
 int const MAX_NUM_CONFIGS = 500;
 int const MAX_NUM_DEFAULTS = 10;
 
-float current_best_solution;
+float current_best_solution = MAX_NUM_TASKS * MAX_LOSS;
+
+// matrix with c columns and r rows. Each cell (c, r) represents the best 
+// obtainable score on task r with configurations c - MAX_NUM_CONFIGS
+float dp_best_obtainable[MAX_NUM_CONFIGS][MAX_NUM_TASKS];
 
 
 void print_array(int array_size, int array[]) {
@@ -82,10 +87,35 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
       start_index = current_subset[current_index - 1] + 1;
     }
     
+    // calculate the potential (or we will cut off the branch)
+    float sum_best_obtainable = 0;
+    for (int i = 0; i < num_tasks; ++i) {
+      float best_obtainable_task = dp_best_obtainable[start_index][i];
+      for (int j = 0; j < current_index; ++j) {
+        best_obtainable_task = fmin(performance[current_subset[j]][i], 
+                                    best_obtainable_task);
+      }
+      sum_best_obtainable += best_obtainable_task;
+    }
+    if (sum_best_obtainable > current_best_solution) {
+      return;
+    }
+    
     for (int i = start_index; i < num_configurations; ++i) {
       current_subset[current_index] = i;
       generate_subsets(num_tasks, num_configurations, num_defaults, 
                        performance, current_index + 1, current_subset);
+    }
+  }
+}
+
+void fill_dp(int num_tasks, int num_configurations, 
+             double performance[MAX_NUM_CONFIGS][MAX_NUM_TASKS]) {
+  for (int i = 0; i < num_tasks; ++i) {
+    float current_min = MAX_LOSS;
+    for (int j = num_configurations - 1; j >= 0; --j) {
+      current_min = fmin(current_min, performance[j][i]);
+      dp_best_obtainable[j][i] = current_min;
     }
   }
 }
@@ -119,7 +149,7 @@ int main() {
       cin >> performance[i][j];
     }
   }
-  
+  fill_dp(num_tasks, num_configs, performance);
   current_best_solution = num_tasks * MAX_LOSS;  
   generate_subsets(num_tasks, num_configs, num_defaults, performance,
                    0, current_subset);

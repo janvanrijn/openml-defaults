@@ -16,9 +16,9 @@ def parse_args():
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--resized_grid_size', type=int, default=5)
+    parser.add_argument('--resized_grid_size', type=int, default=10)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=2)
+    parser.add_argument('--num_defaults', type=int, default=5)
     return parser.parse_args()
 
 
@@ -40,8 +40,14 @@ def run(args):
         df = df.iloc[:, 0:args.restricted_num_tasks]
     print('Reshaped data frame dimensions:', df.shape)
 
+    # pareto front
     df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
     print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
+
+    # sort configurations by 'good ones'
+    df['sum_of_columns'] = df.apply(lambda row: sum(row), axis=1)
+    df = df.sort_values(by=['sum_of_columns'])
+    del df['sum_of_columns']
 
     num_configs, num_tasks = df.shape
     process = subprocess.Popen([args.c_executable], stdout=subprocess.PIPE,
