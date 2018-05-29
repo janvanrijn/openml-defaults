@@ -1,12 +1,9 @@
 import argparse
 import feather
-import json
 import numpy as np
 import openmldefaults
 import os
 import pickle
-import subprocess
-import time
 
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
@@ -19,7 +16,7 @@ def parse_args():
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=5)
+    parser.add_argument('--num_defaults', type=int, default=2)
     return parser.parse_args()
 
 
@@ -62,46 +59,31 @@ def run(args):
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
-    print(openmldefaults.utils.get_time(), 'Started c program')
-    num_configs, num_tasks = df.shape
-    process = subprocess.Popen([args.c_executable], stdout=subprocess.PIPE,
-                               stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    process_input = [str(args.num_defaults), str(num_configs), str(num_tasks)]
-    for iConf in range(num_configs):
-        for iTask in range(num_tasks):
-            process_input.append(str(df.iloc[iConf, iTask]))
+    models = [openmldefaults.models.CppDefaults(args.c_executable)]
 
-    start_time = time.time()
-    out, err = process.communicate("\n".join(process_input))
-    runtime = time.time() - start_time
-    if process.returncode != 0:
-        raise ValueError('Process terminated with non-zero exit code. ')
-    print(openmldefaults.utils.get_time(), 'Runtime: %d seconds' % runtime)
+    results = {}
 
-    for idx, line in enumerate(out.split("\n")):
-        try:
-            solution = json.loads(line)
-        except json.decoder.JSONDecodeError:
-            pass
+    for model in models:
+        solver_dir = model.name
+        dataset_dir = os.path.basename(args.dataset_path)
+        setup_dir = openmldefaults.utils.get_setup_dirname(args)
+        experiment_dir = os.path.join(args.output_dir, dataset_dir, solver_dir, setup_dir)
+        experiment_file = os.path.join(experiment_dir, 'results.pkl')
+        if os.path.isfile(experiment_file):
+            with open(experiment_file, 'rb') as fp:
+                results[model.name] = pickle.load(fp)
+                continue
 
-    print(openmldefaults.utils.get_time(), solution)
-    selected_defaults = [df.index[idx] for idx in solution['solution']]
+        results_dict = model.generate_defaults(df, args.num_defaults)
+        os.makedirs(experiment_dir, exist_ok=True)
+        with open(experiment_file, 'wb') as fp:
+            pickle.dump(results_dict, fp)
 
-    results_dict = {
-        'objective': solution['score'],
-        'run_time': runtime,
-        'defaults': selected_defaults
-    }
-    solver_dir = 'cpp_bruteforce'
-    dataset_dir = os.path.basename(args.dataset_path)
-    experiment_dir = openmldefaults.utils.get_experiment_dir(args)
-    os.makedirs(os.path.join(args.output_dir, dataset_dir, solver_dir, experiment_dir), exist_ok=True)
-    with open(os.path.join(args.output_dir, dataset_dir, solver_dir, experiment_dir, 'results.pkl'), 'wb') as fp:
-        pickle.dump(results_dict, fp)
+        sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['selected_defaults']))
+        diff = abs(sum_of_scores - results_dict['score'])
+        assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, results_dict['score'])
 
-    sum_of_scores = sum(openmldefaults.utils.selected_set(df, selected_defaults))
-    diff = abs(sum_of_scores - solution['score'])
-    assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, solution['score'])
+        results[model.name] = results_dict
 
 
 if __name__ == '__main__':

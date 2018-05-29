@@ -1,5 +1,5 @@
 
-def get_experiment_dir(args):
+def get_setup_dirname(args):
     if args.restricted_num_tasks is not None:
         experiment_dir = 'c%d_t%d_d%d' % (args.resized_grid_size, args.restricted_num_tasks, args.num_defaults)
     else:
