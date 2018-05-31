@@ -1,6 +1,7 @@
 import argparse
 import feather
 import matplotlib.pyplot as plt
+import numpy as np
 import openmldefaults
 import os
 import pickle
@@ -20,6 +21,16 @@ def parse_args():
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
     parser.add_argument('--num_defaults', type=int, default=7)
     return parser.parse_args()
+
+
+def simulate_random_search(df, num_iterations, num_repeats):
+    num_obs, num_tasks = df.shape
+    all_results = np.zeros((num_repeats, num_tasks), dtype=float)
+    for i in range(num_repeats):
+        all_results[i] = openmldefaults.utils.selected_set_index(df, np.random.choice(num_obs, num_iterations)).values
+    result = np.mean(all_results, axis=1)
+    assert result.shape == (num_repeats,)
+    return result
 
 
 def plot(data, output_file):
@@ -68,7 +79,10 @@ def run(args):
             print(results_file, strategy_results['objective'])
 
             for name, df in frames.items():
-                results[name][strategy] = openmldefaults.utils.selected_set(df, strategy_results['defaults']).values
+                results[name][strategy] = openmldefaults.utils.selected_set(df_test, strategy_results['defaults']).values
+    for evaluation_set in results:
+        results[evaluation_set]['random_search_avg'] = simulate_random_search(df_test, args.num_defaults, 100)
+
     plot(results, os.path.join(args.output_dir, '%s_%s.png' % (train_data_name, setup_name)))
     print(results)
 

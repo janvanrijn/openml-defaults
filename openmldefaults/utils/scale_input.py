@@ -12,6 +12,14 @@ def selected_set(df: pd.DataFrame, defaults: List[Tuple]):
     return df.min(axis=0)
 
 
+def selected_set_index(df: pd.DataFrame, indices: List[int]):
+    # filters out only the algorithms that we have in the 'set of defaults'
+    df = df.iloc[indices]
+    # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
+    # then we take the median of this
+    return df.min(axis=0)
+
+
 def reshape_configs(df, params, resized_grid_size):
     # subsample the hyperparameter grid
     for param in params:

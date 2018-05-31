@@ -16,10 +16,12 @@
 
 using namespace std;
 
+bool branch_and_bound;
 double const MAX_LOSS = 1.0;
 int const MAX_NUM_TASKS = 30;
 int const MAX_NUM_CONFIGS = 500;
 int const MAX_NUM_DEFAULTS = 10;
+int nodes_visited = 0;
 
 float current_best_solution = MAX_NUM_TASKS * MAX_LOSS;
 
@@ -63,6 +65,8 @@ double evaluate_subset(int num_tasks, int num_defaults,
 void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
                       double performance[MAX_NUM_CONFIGS][MAX_NUM_TASKS],
                       int current_index, int current_subset[MAX_NUM_DEFAULTS]) {
+  nodes_visited += 1;
+  
   if (current_index >= num_defaults) {
     double current_score = evaluate_subset(num_tasks, num_defaults, performance,
                                            current_subset);
@@ -72,8 +76,10 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
       cout << "{";
       cout << "\"solution\": [";
       print_array(num_defaults, current_subset);
-      cout << "], ";
-      cout << "\"score\": " << current_score;
+      cout << "]";
+      cout << ", \"score\": " << current_score;
+      cout << ", \"branch_and_bound\": " << branch_and_bound ;
+      cout << ", \"nodes_visited\": " << nodes_visited;
       //for (int i = 0; i < num_defaults; ++i) {
       //  cout << ", \"losses_config_" << current_subset[i] << "\": [";
       //  print_array_d(num_tasks, performance[current_subset[i]]);
@@ -88,17 +94,19 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
     }
     
     // calculate the potential (or we will cut off the branch)
-    float sum_best_obtainable = 0;
-    for (int i = 0; i < num_tasks; ++i) {
-      float best_obtainable_task = dp_best_obtainable[start_index][i];
-      for (int j = 0; j < current_index; ++j) {
-        best_obtainable_task = fmin(performance[current_subset[j]][i], 
-                                    best_obtainable_task);
+    if (branch_and_bound) {
+      float sum_best_obtainable = 0;
+      for (int i = 0; i < num_tasks; ++i) {
+        float best_obtainable_task = dp_best_obtainable[start_index][i];
+        for (int j = 0; j < current_index; ++j) {
+          best_obtainable_task = fmin(performance[current_subset[j]][i], 
+                                      best_obtainable_task);
+        }
+        sum_best_obtainable += best_obtainable_task;
       }
-      sum_best_obtainable += best_obtainable_task;
-    }
-    if (sum_best_obtainable > current_best_solution) {
-      return;
+      if (sum_best_obtainable > current_best_solution) {
+        return;
+      }
     }
     
     for (int i = start_index; i < num_configurations; ++i) {
@@ -128,6 +136,7 @@ int main() {
   double performance[MAX_NUM_CONFIGS][MAX_NUM_TASKS];
   int current_subset[MAX_NUM_DEFAULTS];
   
+  cin >> branch_and_bound;
   cin >> num_defaults;
   if (num_defaults > MAX_NUM_DEFAULTS) {
     cout << "Num defaults too high. Max allowed: " << MAX_NUM_DEFAULTS << endl;
