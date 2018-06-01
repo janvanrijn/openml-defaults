@@ -38,6 +38,11 @@ def plot(data, title, output_file):
     fig, ax = plt.subplots(1, len(data), figsize=(8 * len(data), 6))
     fig.text(0, 1, title, va='top', ha='left')
     for idx, evaluation_set in enumerate(data.keys()):
+        if len(data) > 1:
+            curr_ax = ax[idx]
+        else:
+            curr_ax = ax
+
         labels = []
         series = []
 
@@ -46,10 +51,11 @@ def plot(data, title, output_file):
             series.append(data[evaluation_set][model])
 
         # basic plot
-        ax[idx].boxplot(series)
-        ax[idx].set_xticklabels(labels, rotation=45, ha='right')
-        ax[idx].set_title(evaluation_set)
-        ax[idx].axhline(y=0)
+        curr_ax.boxplot(series)
+        curr_ax.set_xticklabels(labels, rotation=45, ha='right')
+        curr_ax.set_title(evaluation_set)
+        # draws horizontal line
+        curr_ax.axhline(y=0)
 
     plt.tight_layout()
     plt.savefig(output_file)
@@ -70,17 +76,17 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
         raise ValueError()
 
     setup_name = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
-    results = {'train': dict(), 'test': dict()}
+    results = dict()
     for strategy in os.listdir(data_dir):
         setup_dir = os.path.join(data_dir, strategy, setup_name)
         if os.path.isdir(setup_dir):
             results_file = os.path.join(setup_dir, 'results.pkl')
-            results['test'][strategy] = dict()
             with open(results_file, 'rb') as fp:
                 strategy_results = pickle.load(fp)
-            print(results_file, strategy_results['objective'])
 
             for eval_frame, df in frames.items():
+                if eval_frame not in results:
+                    results[eval_frame] = dict()
                 results[eval_frame][strategy] = openmldefaults.utils.selected_set(df, strategy_results['defaults']).values
 
     for eval_frame, df in frames.items():
@@ -96,7 +102,6 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
         for strategy in results[eval_frame]:
             if strategy == vs_strategy:
                 continue
-            print(strategy, vs_strategy)
             current_result = results[eval_frame][vs_strategy] - results[eval_frame][strategy]
             results_relative[eval_frame]['vs_%s' % strategy] = current_result
     plot(results_relative, title, os.path.join(output_dir, 'relative_%s_%s.png' % (train_data_name, setup_name)))
