@@ -46,6 +46,7 @@ class CppDefaults(object):
             'run_time': runtime,
             'defaults': selected_defaults,
             'nodes_visited': solution['nodes_visited'],
+            'leafs_visited': solution['leafs_visited'],
             'branch_and_bound': solution['branch_and_bound']
         }
         return results_dict

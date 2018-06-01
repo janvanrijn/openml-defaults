@@ -3,6 +3,7 @@ import feather
 import numpy as np
 import openmldefaults
 import os
+import scipy.misc
 
 
 def parse_args():
@@ -43,6 +44,7 @@ def run(args):
               openmldefaults.models.CppDefaults(args.c_executable, True)]
 
     for num_defaults in range(2, 5):
+        c_choose_d = int(scipy.misc.comb(len(df), num_defaults))
         result_a = models[0].generate_defaults(df, num_defaults)
         result_b = models[1].generate_defaults(df, num_defaults)
         assert result_a['branch_and_bound'] == 0
@@ -50,6 +52,7 @@ def run(args):
         assert result_a['defaults'] == result_b['defaults']
         assert result_a['objective'] == result_b['objective']
         assert result_a['nodes_visited'] > result_b['nodes_visited']
+        assert result_a['leafs_visited'] == c_choose_d
 
 
 if __name__ == '__main__':

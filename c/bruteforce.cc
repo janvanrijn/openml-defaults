@@ -22,6 +22,7 @@ int const MAX_NUM_TASKS = 30;
 int const MAX_NUM_CONFIGS = 500;
 int const MAX_NUM_DEFAULTS = 10;
 int nodes_visited = 0;
+int leafs_visited = 0;
 
 float current_best_score = MAX_NUM_TASKS * MAX_LOSS;
 int current_best_solution[MAX_NUM_DEFAULTS];
@@ -48,6 +49,7 @@ void print_array_d(int array_size, double array[]) {
 double evaluate_subset(int num_tasks, int num_defaults, 
                        double performance[MAX_NUM_CONFIGS][MAX_NUM_TASKS],
                        int current_subset[MAX_NUM_DEFAULTS]) {
+  leafs_visited += 1;
   double sum_of_losses = 0;
   for (int i = 0; i < num_tasks; ++i) {
     double current_task_loss = MAX_LOSS;
@@ -180,8 +182,9 @@ int main() {
   print_array(num_defaults, current_best_solution);
   cout << "]";
   cout << ", \"score\": " << current_best_score;
-  cout << ", \"branch_and_bound\": " << branch_and_bound ;
+  cout << ", \"branch_and_bound\": " << branch_and_bound;
   cout << ", \"nodes_visited\": " << nodes_visited;
+  cout << ", \"leafs_visited\": " << leafs_visited;
   //for (int i = 0; i < num_defaults; ++i) {
   //  cout << ", \"losses_config_" << current_subset[i] << "\": [";
   //  print_array_d(num_tasks, performance[current_subset[i]]);
