@@ -18,7 +18,7 @@ using namespace std;
 
 bool branch_and_bound;
 double const MAX_LOSS = 3.0;
-int const MAX_NUM_TASKS = 30;
+int const MAX_NUM_TASKS = 100;
 int const MAX_NUM_CONFIGS = 500;
 int const MAX_NUM_DEFAULTS = 10;
 int nodes_visited = 0;
