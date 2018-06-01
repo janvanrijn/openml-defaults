@@ -1,5 +1,6 @@
 import json
 import openmldefaults
+import os
 import subprocess
 import time
 
@@ -10,6 +11,9 @@ class CppDefaults(object):
         self.c_executable = c_executable
         self.name = 'cpp_bruteforce'
         self.apply_branch_bound = apply_branch_bound
+
+        if not os.path.isfile(c_executable):
+            raise ValueError('Please compile C program first')
 
     def generate_defaults(self, df, num_defaults):
         num_configs, num_tasks = df.shape

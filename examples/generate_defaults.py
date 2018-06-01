@@ -1,5 +1,4 @@
 import argparse
-import feather
 import numpy as np
 import openmldefaults
 import os
@@ -11,44 +10,17 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
                         default=os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather')
-    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
-    parser.add_argument('--c_executable', type=str, default='../c/main')
+    parser.add_argument('--flip_performances', action='store_true')
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=16)
-    parser.add_argument('--restricted_num_tasks', type=int, default=None)
     parser.add_argument('--num_defaults', type=int, default=3)
+    parser.add_argument('--c_executable', type=str, default='../c/main')
+    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
 
 
-def print_columns(df, params):
-    for param in params:
-        unique = np.array(df[param].unique())
-        print(openmldefaults.utils.get_time(), '%s unique values: %s (%d)' % (param, unique, len(unique)))
-
-
-def run(args):
-    df = feather.read_dataframe(args.dataset_path)
-    print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)
-
-    for param in args.params:
-        if param not in df.columns.values:
-            raise ValueError('Param column not found. Columns %s, illegal: %s' % (df.columns.values, param))
-
-    if not os.path.isfile(args.c_executable):
-        raise ValueError('Please compile C program first')
-
-    if args.resized_grid_size is not None:
-        df = openmldefaults.utils.reshape_configs(df, args.params, args.resized_grid_size)
-
-    print_columns(df, args.params)
-
-    # always set the index
-    df = df.set_index(args.params)
-
-    if args.restricted_num_tasks is not None:
-        # subsample num tasks
-        df = df.iloc[:, 0:args.restricted_num_tasks]
-    print(openmldefaults.utils.get_time(), 'Reshaped data frame dimensions:', df.shape)
+def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults, c_executable, output_dir):
+    df = openmldefaults.utils.load_dataset(dataset_path, params, resized_grid_size, flip_performances)
 
     # pareto front
     df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
@@ -59,22 +31,22 @@ def run(args):
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
-    models = [openmldefaults.models.CppDefaults(args.c_executable, True), openmldefaults.models.GreedyDefaults()]
+    models = [openmldefaults.models.CppDefaults(c_executable, True), openmldefaults.models.GreedyDefaults()]
 
     results = {}
 
     for model in models:
         solver_dir = model.name
-        dataset_dir = os.path.basename(args.dataset_path)
-        setup_dir = openmldefaults.utils.get_setup_dirname(args)
-        experiment_dir = os.path.join(args.output_dir, dataset_dir, solver_dir, setup_dir)
+        dataset_dir = os.path.basename(dataset_path)
+        setup_dir = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
+        experiment_dir = os.path.join(output_dir, dataset_dir, solver_dir, setup_dir)
         experiment_file = os.path.join(experiment_dir, 'results.pkl')
         if os.path.isfile(experiment_file):
             with open(experiment_file, 'rb') as fp:
                 results[model.name] = pickle.load(fp)
                 continue
 
-        results_dict = model.generate_defaults(df, args.num_defaults)
+        results_dict = model.generate_defaults(df, num_defaults)
         os.makedirs(experiment_dir, exist_ok=True)
         with open(experiment_file, 'wb') as fp:
             pickle.dump(results_dict, fp)
@@ -87,4 +59,6 @@ def run(args):
 
 
 if __name__ == '__main__':
-    run(parse_args())
+    args = parse_args()
+    run(args.dataset_path, args.flip_performances, args.params, args.resized_grid_size, args.num_defaults,
+        args.c_executable, args.output_dir)

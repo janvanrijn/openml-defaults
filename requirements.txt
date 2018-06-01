@@ -1,5 +1,6 @@
 Cython
 feather-format
+liac-arff
 matplotlib
 numpy
 pandas

@@ -1,6 +1,5 @@
 import argparse
 import feather
-import numpy as np
 import openmldefaults
 import os
 import scipy.misc

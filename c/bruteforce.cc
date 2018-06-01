@@ -17,7 +17,7 @@
 using namespace std;
 
 bool branch_and_bound;
-double const MAX_LOSS = 2.0;
+double const MAX_LOSS = 3.0;
 int const MAX_NUM_TASKS = 30;
 int const MAX_NUM_CONFIGS = 500;
 int const MAX_NUM_DEFAULTS = 10;
@@ -159,7 +159,7 @@ int main() {
       clog << "Performance of conf " << i << " on task " << j << "? [float]: .. ";
       cin >> performance[i][j];
       clog << performance[i][j];
-      if (performance[i][j] < -2 || performance[i][j] > 2) {
+      if (performance[i][j] < -1 * MAX_LOSS || performance[i][j] > MAX_LOSS) {
         clog << "Wrong performance for config " << i << " task " << j 
              << ": " << performance[i][j] << endl;
         return 1;

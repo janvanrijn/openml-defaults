@@ -14,12 +14,13 @@ def parse_args():
                         default=os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather')
     parser.add_argument('--dataset_test_path', type=str,
                         default=os.path.expanduser('~') + '/data/openml-defaults/test_svm.feather')
+    parser.add_argument('--flip_performances', action='store_true')
+    parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=7)
+    parser.add_argument('--num_defaults', type=int, default=1)
     return parser.parse_args()
 
 
@@ -54,12 +55,11 @@ def plot(data, output_file):
 
 
 def run(args):
+    frames = dict()
+    frames['train'] = openmldefaults.utils.load_dataset(args.dataset_train_path, args.params, None, args.flip_performances)
 
-    df_train = feather.read_dataframe(args.dataset_test_path)
-    df_train = df_train.set_index(args.params)
-    df_test = feather.read_dataframe(args.dataset_test_path)
-    df_test = df_test.set_index(args.params)
-    frames = {'train': df_train, 'test': df_test}
+    if args.dataset_test_path is not None:
+        frames['test'] = openmldefaults.utils.load_dataset(args.dataset_test_path, args.params, None, args.flip_performances)
 
     train_data_name = os.path.basename(args.dataset_train_path)
     data_dir = os.path.join(args.output_dir, train_data_name)
@@ -67,7 +67,7 @@ def run(args):
     if not os.path.isdir(data_dir):
         raise ValueError()
 
-    setup_name = openmldefaults.utils.get_setup_dirname(args)
+    setup_name = openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults)
     results = {'train': dict(), 'test': dict()}
     for strategy in os.listdir(data_dir):
         setup_dir = os.path.join(data_dir, strategy, setup_name)
@@ -78,10 +78,11 @@ def run(args):
                 strategy_results = pickle.load(fp)
             print(results_file, strategy_results['objective'])
 
-            for name, df in frames.items():
-                results[name][strategy] = openmldefaults.utils.selected_set(df_test, strategy_results['defaults']).values
-    for evaluation_set in results:
-        results[evaluation_set]['random_search_avg'] = simulate_random_search(df_test, args.num_defaults, 100)
+            for eval_frame, df in frames.items():
+                results[eval_frame][strategy] = openmldefaults.utils.selected_set(df, strategy_results['defaults']).values
+
+    for eval_frame, df in frames.items():
+        results[eval_frame]['random_search_avg'] = simulate_random_search(df, args.num_defaults, 100)
 
     plot(results, os.path.join(args.output_dir, '%s_%s.png' % (train_data_name, setup_name)))
     print(results)
