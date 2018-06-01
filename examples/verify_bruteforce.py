@@ -9,26 +9,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
                         default=os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather')
+    parser.add_argument('--flip_performances', action='store_true')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=5)
-    parser.add_argument('--restricted_num_tasks', type=int, default=5)
     return parser.parse_args()
 
 
 def run(args):
-    df = feather.read_dataframe(args.dataset_path)
-    print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)
-
-    if args.resized_grid_size is not None:
-        df = openmldefaults.utils.reshape_configs(df, args.params, args.resized_grid_size)
-
-    # always set the index
-    df = df.set_index(args.params)
-
-    if args.restricted_num_tasks is not None:
-        # subsample num tasks
-        df = df.iloc[:, 0:args.restricted_num_tasks]
+    df = openmldefaults.utils.load_dataset(args.dataset_path, args.params, args.resized_grid_size, args.flip_performances)
 
     df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
     print(openmldefaults.utils.get_time(),

@@ -1,5 +1,4 @@
 import argparse
-import feather
 import matplotlib.pyplot as plt
 import numpy as np
 import openmldefaults
