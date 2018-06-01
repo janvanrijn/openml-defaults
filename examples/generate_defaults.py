@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
-    parser.add_argument('--num_defaults', type=int, default=8)
+    parser.add_argument('--num_defaults', type=int, default=3)
     return parser.parse_args()
 
 
@@ -59,7 +59,7 @@ def run(args):
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
-    models = [openmldefaults.models.CppDefaults(args.c_executable), openmldefaults.models.GreedyDefaults()]
+    models = [openmldefaults.models.CppDefaults(args.c_executable, True), openmldefaults.models.GreedyDefaults()]
 
     results = {}
 

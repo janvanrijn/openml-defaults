@@ -17,13 +17,14 @@
 using namespace std;
 
 bool branch_and_bound;
-double const MAX_LOSS = 1.0;
+double const MAX_LOSS = 2.0;
 int const MAX_NUM_TASKS = 30;
 int const MAX_NUM_CONFIGS = 500;
 int const MAX_NUM_DEFAULTS = 10;
 int nodes_visited = 0;
 
-float current_best_solution = MAX_NUM_TASKS * MAX_LOSS;
+float current_best_score = MAX_NUM_TASKS * MAX_LOSS;
+int current_best_solution[MAX_NUM_DEFAULTS];
 
 // matrix with c columns and r rows. Each cell (c, r) represents the best 
 // obtainable score on task r with configurations c - MAX_NUM_CONFIGS
@@ -71,21 +72,11 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
     double current_score = evaluate_subset(num_tasks, num_defaults, performance,
                                            current_subset);
     
-    if (current_score < current_best_solution) {
-      current_best_solution = current_score;
-      cout << "{";
-      cout << "\"solution\": [";
-      print_array(num_defaults, current_subset);
-      cout << "]";
-      cout << ", \"score\": " << current_score;
-      cout << ", \"branch_and_bound\": " << branch_and_bound ;
-      cout << ", \"nodes_visited\": " << nodes_visited;
-      //for (int i = 0; i < num_defaults; ++i) {
-      //  cout << ", \"losses_config_" << current_subset[i] << "\": [";
-      //  print_array_d(num_tasks, performance[current_subset[i]]);
-      //  cout << "]";
-      //}
-      cout << "}" << endl;
+    if (current_score < current_best_score) {
+      current_best_score = current_score;
+      for (int i = 0; i < num_defaults; ++i) {
+        current_best_solution[i] = current_subset[i];
+      }
     }
   } else {
     int start_index = 0;
@@ -104,7 +95,7 @@ void generate_subsets(int num_tasks, int num_configurations, int num_defaults,
         }
         sum_best_obtainable += best_obtainable_task;
       }
-      if (sum_best_obtainable > current_best_solution) {
+      if (sum_best_obtainable > current_best_score) {
         return;
       }
     }
@@ -136,31 +127,67 @@ int main() {
   double performance[MAX_NUM_CONFIGS][MAX_NUM_TASKS];
   int current_subset[MAX_NUM_DEFAULTS];
   
+  clog << "Branch and Bound? [1/0]: .. "; 
   cin >> branch_and_bound;
+  clog << branch_and_bound; 
+  clog << "Num defaults? [int]: .. ";
   cin >> num_defaults;
+  clog << num_defaults;
   if (num_defaults > MAX_NUM_DEFAULTS) {
-    cout << "Num defaults too high. Max allowed: " << MAX_NUM_DEFAULTS << endl;
+    clog << "Num defaults too high. Max allowed: " << MAX_NUM_DEFAULTS << endl;
     return 1;
   }
+  clog << "Num configs? [int]: .. ";
   cin >> num_configs;
+  clog << num_configs;
   if (num_configs > MAX_NUM_CONFIGS) {
-    cout << "Num configs too high. Max allowed: " << MAX_NUM_CONFIGS << endl;
+    clog << "Num configs too high. Max allowed: " << MAX_NUM_CONFIGS << endl;
     return 1;
   }
+  clog << "Num tasks? [int]: .. ";
   cin >> num_tasks;
+  clog << num_tasks;
   if (num_tasks > MAX_NUM_TASKS) {
-    cout << "Num tasks too high. Max allowed: " << MAX_NUM_TASKS << endl;
+    clog << "Num tasks too high. Max allowed: " << MAX_NUM_TASKS << endl;
     return 1;
   }
   
   for (int i = 0; i < num_configs; ++i) {
     for (int j = 0; j < num_tasks; ++j) {
+      clog << "Performance of conf " << i << " on task " << j << "? [float]: .. ";
       cin >> performance[i][j];
+      clog << performance[i][j];
+      if (performance[i][j] < -2 || performance[i][j] > 2) {
+        clog << "Wrong performance for config " << i << " task " << j 
+             << ": " << performance[i][j] << endl;
+        return 1;
+      }
     }
   }
   fill_dp(num_tasks, num_configs, performance);
-  current_best_solution = num_tasks * MAX_LOSS;  
+  current_best_score = (num_tasks + 1) * MAX_LOSS;
+  
+  cerr << "{ \"num_defaults\":" << num_defaults;
+  cerr << ", \"num_configs\":" << num_configs;
+  cerr << ", \"num_tasks\":" << num_tasks;
+  cerr << ", \"branch_and_bound\":" << branch_and_bound;
+  cerr << "}";
+  
   generate_subsets(num_tasks, num_configs, num_defaults, performance,
                    0, current_subset);
+  cout << "{";
+  cout << "\"solution\": [";
+  print_array(num_defaults, current_best_solution);
+  cout << "]";
+  cout << ", \"score\": " << current_best_score;
+  cout << ", \"branch_and_bound\": " << branch_and_bound ;
+  cout << ", \"nodes_visited\": " << nodes_visited;
+  //for (int i = 0; i < num_defaults; ++i) {
+  //  cout << ", \"losses_config_" << current_subset[i] << "\": [";
+  //  print_array_d(num_tasks, performance[current_subset[i]]);
+  //  cout << "]";
+  //}
+  cout << "}";
+  return 0;
 }
 
