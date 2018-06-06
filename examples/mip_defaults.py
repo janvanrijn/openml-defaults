@@ -39,7 +39,7 @@ def get_mixed_integer_formulation(df, num_defaults):
 
     x = np.empty(num_configurations, dtype=pulp.LpVariable)
     for row in range(num_configurations):
-        current = pulp.LpVariable("config_" + str(df.index.tolist()[row]), cat=pulp.LpBinary)
+        current = pulp.LpVariable("config_%d" % row, cat=pulp.LpBinary)
         x[row] = current
     mip_optimizer += pulp.lpSum(x) == num_defaults
 
@@ -57,7 +57,6 @@ def get_mixed_integer_formulation(df, num_defaults):
 
 
 def run(args):
-    start_time = time.time()
 
     df = openmldefaults.utils.load_dataset(args.dataset_path, args.params, args.resized_grid_size, args.flip_performances)
     if df.min().min() < 0:
@@ -71,6 +70,7 @@ def run(args):
     os.makedirs(os.path.join(args.output_dir, solver_dir, experiment_dir), exist_ok=True)
     outputfile = os.path.join(args.output_dir, solver_dir, experiment_dir, 'minimize_multi_defaults.lp')
     mip_optimizer.writeLP(outputfile)
+    start_time = time.time()
     mip_optimizer.solve(solver=getattr(pulp, args.solver)())
     run_time = time.time() - start_time
 
@@ -86,18 +86,9 @@ def run(args):
         for variable in mip_optimizer.variables():
             if variable.name.startswith('config_'):
                 if variable.varValue == 1:
-                    variables = variable.name.split('config_')[1][1:-1].split(',')
-                    print('vars', variables)
-                    config = []
-                    for var in variables:
-                        var = var.replace('_', '')
-
-                        try:
-                            config.append(float(var))
-                        except ValueError:
-                            config.append(var[1:-1])
-                    print('config', config)
-                    defaults.append(tuple(config))
+                    index = int(variable.name.split('config_')[1])
+                    config = df.index.values[index]
+                    defaults.append(config)
 
         # The optimised objective function value is printed to the screen
         result_dict['defaults'] = defaults

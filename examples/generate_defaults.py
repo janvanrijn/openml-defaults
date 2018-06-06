@@ -1,5 +1,4 @@
 import argparse
-import numpy as np
 import openmldefaults
 import os
 import pickle
@@ -31,7 +30,9 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
-    models = [openmldefaults.models.CppDefaults(c_executable, True), openmldefaults.models.GreedyDefaults()]
+    models = [openmldefaults.models.CppDefaults(c_executable, True),
+              openmldefaults.models.GreedyDefaults(),
+              openmldefaults.models.MipDefaults('GLPK_CMD')]
 
     results = {}
 
