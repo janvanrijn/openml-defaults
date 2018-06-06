@@ -75,6 +75,6 @@ class MipDefaults(object):
         results_dict = {
             'objective': sum(result_frame),
             'run_time': runtime,
-            'defaults': defaults,
+            'defaults': set(defaults),
         }
         return results_dict

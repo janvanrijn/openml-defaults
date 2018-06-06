@@ -54,9 +54,16 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
 
         sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['defaults']))
         diff = abs(sum_of_scores - results_dict['objective'])
-        assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores, results_dict['score'])
+        assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores,
+                                                                                            results_dict['score'])
 
         results[model.name] = results_dict
+        print(results_dict)
+
+    if 'cpp_bruteforce' in results and 'mip' in results:
+        diff = abs(results['cpp_bruteforce']['objective'] - results['mip']['objective'])
+        assert diff < 0.0001
+        assert set(results['cpp_bruteforce']['defaults']) == set(results['mip']['defaults'])
 
 
 if __name__ == '__main__':

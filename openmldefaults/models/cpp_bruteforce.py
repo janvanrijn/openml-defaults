@@ -43,7 +43,7 @@ class CppDefaults(object):
                 raise ValueError('Could not parse result as json: %s' % line)
 
         print(openmldefaults.utils.get_time(), solution)
-        selected_defaults = [df.index[idx] for idx in solution['solution']]
+        selected_defaults = {df.index[idx] for idx in solution['solution']}
 
         results_dict = {
             'objective': solution['score'],
