@@ -1,5 +1,6 @@
 import argparse
-import feather
+import json
+import numpy as np
 import openmldefaults
 import os
 import pickle
@@ -11,81 +12,65 @@ import time
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/mlr.classif.rpart.feather')
+                        default=os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather')
+    parser.add_argument('--flip_performances', action='store_true')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--resized_grid_size', type=int, default=5)
-    parser.add_argument('--restricted_num_tasks', type=int, default=5)
-    parser.add_argument('--num_defaults', type=int, default=2)
+    parser.add_argument('--resized_grid_size', type=int, default=10)
+    parser.add_argument('--num_defaults', type=int, default=5)
     parser.add_argument('--solver', type=str, default='GLPK_CMD')
     return parser.parse_args()
 
 
-def get_mixed_integer_formulation(df, num_defaults, num_tasks):
-    big_m = num_tasks + 1  # keep the big m tight
-
+def get_mixed_integer_formulation(df, num_defaults):
     num_configurations, num_tasks = df.shape
     mip_optimizer = pulp.LpProblem('ComplementaryConfigurationSelector', pulp.LpMinimize)
 
-    # creates a variable for each configuration (var = 1 iff it was selected to the default set)
-    config_identifier_variables = list()
-    for config_idx in range(num_configurations):
-        config_identifier = pulp.LpVariable('config_' + str(df.index.tolist()[config_idx]), cat=pulp.LpBinary)
-        config_identifier_variables.append(config_identifier)
-    # ensures that only the required number of defaults is chosen
-    mip_optimizer += pulp.lpSum(config_identifier_variables) == num_defaults
+    Q = list()
+    for row in range(num_configurations):
+        Q.append(list())
+        for column in range(num_tasks):
+            Q[row].append(set())
+            for row_prime in range(num_configurations):
+                if df.iloc[row_prime, column] < df.iloc[row, column]:
+                    Q[row][column].add(row_prime)
+                elif df.iloc[row_prime, column] == df.iloc[row, column] and row_prime < row:
+                    Q[row][column].add(row_prime)
 
-    # creates a variable for each dataset. This stores the minimal achievable score given the selected defaults
-    dataset_min_score_variables = list()
-    for task_idx, task_name in enumerate(df.columns):
-        current_dataset_min_score = pulp.LpVariable(str(df.columns.values[task_idx]), 0.0, 1.0, pulp.LpContinuous)
-        dataset_min_score_variables.append(current_dataset_min_score)
+    x = np.empty(num_configurations, dtype=pulp.LpVariable)
+    for row in range(num_configurations):
+        current = pulp.LpVariable("config_" + str(df.index.tolist()[row]), cat=pulp.LpBinary)
+        x[row] = current
+    mip_optimizer += pulp.lpSum(x) == num_defaults
 
-        # in order to store the minimum of a group of values (over which we minimize), we need a set of auxiliary
-        # variables and big M conventions according to Greg Glockners answer on Stackoverlow
-        # https://stackoverflow.com/questions/10792139/using-min-max-within-an-integer-linear-program
-        auxilary_variables = list()
-        for config_idx, civ in enumerate(config_identifier_variables):
-            current_auxilary = pulp.LpVariable('task_%d_conf_%d' % (task_idx, config_idx), cat=pulp.LpBinary)
-            mip_optimizer += current_dataset_min_score >= \
-                             (df.iloc[config_idx][task_name] * config_identifier_variables[config_idx]) - \
-                             (big_m * current_auxilary)
-            # due to the nature of our problem, we need to ensure that the configuration variable OR the auxiliary
-            # variable is set
-            mip_optimizer += 0 <= 2 - config_identifier_variables[config_idx] - current_auxilary <= 1
-            auxilary_variables.append(current_auxilary)
-        mip_optimizer += pulp.lpSum(auxilary_variables) == num_configurations - 1
+    y = np.empty((num_configurations, num_tasks), dtype=pulp.LpVariable)
+    for row in range(num_configurations):
+        for column in range(num_tasks):
+            current = pulp.LpVariable('auxilary_%d_%d' % (row, column), cat=pulp.LpContinuous)
+            x_vars = [x[s] for s in Q[row][column]]
+            y[row, column] = current
+            mip_optimizer += current >= x[row] - pulp.lpSum(x_vars)
+            mip_optimizer += current >= 0
 
-    # objective function: minimize the sum of score variables
-    mip_optimizer += pulp.lpSum(dataset_min_score_variables)
+    mip_optimizer += pulp.lpSum(y[row][column] * df.iloc[row, column] for row in range(num_configurations) for column in range(num_tasks))
     return mip_optimizer
 
 
 def run(args):
     start_time = time.time()
 
-    df = feather.read_dataframe(args.dataset_path)
-    print(df.shape)
+    df = openmldefaults.utils.load_dataset(args.dataset_path, args.params, args.resized_grid_size, args.flip_performances)
+    if df.min().min() < 0:
+        df[df.columns.values] += (-1 * df.min().min())
+    assert(df.min().min() >= 0)
 
-    if args.resized_grid_size is not None:
-        df = openmldefaults.utils.reshape_configs(df, args.params, args.resized_grid_size)
-
-    # always set the index
-    df = df.set_index(args.params)
-
-    if args.restricted_num_tasks is not None:
-        # subsample num tasks
-        df = df.iloc[:, 0:args.restricted_num_tasks]
-    print('Reshaped data frame dimensions:', df.shape)
-
-    #df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
-    #print('Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
-    mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults, df.shape[1])
+    mip_optimizer = get_mixed_integer_formulation(df, args.num_defaults)
 
     solver_dir = 'mip_%s' % args.solver
-    experiment_dir = openmldefaults.utils.get_experiment_dir(args)
+    experiment_dir = openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults)
     os.makedirs(os.path.join(args.output_dir, solver_dir, experiment_dir), exist_ok=True)
-    mip_optimizer.writeLP(os.path.join(args.output_dir, solver_dir, experiment_dir, 'minimize_multi_defaults.lp'))
+    outputfile = os.path.join(args.output_dir, solver_dir, experiment_dir, 'minimize_multi_defaults.lp')
+    mip_optimizer.writeLP(outputfile)
     mip_optimizer.solve(solver=getattr(pulp, args.solver)())
     run_time = time.time() - start_time
 
@@ -101,9 +86,18 @@ def run(args):
         for variable in mip_optimizer.variables():
             if variable.name.startswith('config_'):
                 if variable.varValue == 1:
-                    variables = variable.name.split('config_')[1][1:-1].split(',_')
-                    variables = [float(var) for var in variables]
-                    defaults.append(tuple(variables))
+                    variables = variable.name.split('config_')[1][1:-1].split(',')
+                    print('vars', variables)
+                    config = []
+                    for var in variables:
+                        var = var.replace('_', '')
+
+                        try:
+                            config.append(float(var))
+                        except ValueError:
+                            config.append(var[1:-1])
+                    print('config', config)
+                    defaults.append(tuple(config))
 
         # The optimised objective function value is printed to the screen
         result_dict['defaults'] = defaults
@@ -115,6 +109,8 @@ def run(args):
         result_frame = openmldefaults.utils.selected_set(df, defaults)
         diff = sum(result_frame) - result_dict['objective']
         assert abs(diff) < 0.00001, '%f vs %f' % (sum(result_frame), result_dict['objective'])
+    else:
+        raise Exception('Exit with status: %s' % result_dict['status'])
 
 
 if __name__ == '__main__':
