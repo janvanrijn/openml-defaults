@@ -19,6 +19,7 @@ def parse_args():
 
 
 def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults, c_executable, output_dir):
+    print(openmldefaults.utils.get_time(), '=== NUM DEFAULTS: %d ===' % num_defaults)
     df = openmldefaults.utils.load_dataset(dataset_path, params, resized_grid_size, flip_performances)
 
     # pareto front
@@ -37,6 +38,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
     results = {}
 
     for model in models:
+        print(openmldefaults.utils.get_time(), 'Started on model: %s' % model.name)
         solver_dir = model.name
         dataset_dir = os.path.basename(dataset_path)
         setup_dir = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)

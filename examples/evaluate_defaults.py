@@ -73,10 +73,11 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
     data_dir = os.path.join(output_dir, train_data_name)
 
     if not os.path.isdir(data_dir):
-        raise ValueError()
+        raise ValueError('dir does not exists: %s' % data_dir)
 
     setup_name = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
     results = dict()
+    runtime = {'train': dict()}
     for strategy in os.listdir(data_dir):
         setup_dir = os.path.join(data_dir, strategy, setup_name)
         if os.path.isdir(setup_dir):
@@ -88,6 +89,7 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
                 if eval_frame not in results:
                     results[eval_frame] = dict()
                 results[eval_frame][strategy] = openmldefaults.utils.selected_set(df, strategy_results['defaults']).values
+            runtime['train'][strategy] = strategy_results['run_time']
 
     for eval_frame, df in frames.items():
         for budget in range(4, 0, -1):
@@ -95,6 +97,7 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
 
     title = '%s (%d defaults)' % (os.path.basename(dataset_train_path), num_defaults)
     plot(results, title, os.path.join(output_dir, 'absolute_%s_%s.png' % (train_data_name, setup_name)))
+    plot(runtime, title, os.path.join(output_dir, 'runtime_%s_%s.png' % (train_data_name, setup_name)))
 
     results_relative = dict()
     for eval_frame, df in frames.items():
@@ -108,4 +111,6 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
 
 
 if __name__ == '__main__':
-    run(parse_args())
+    args = parse_args()
+    run(args.dataset_train_path, args.dataset_test_path, args.flip_performances, args.params, args.resized_grid_size,
+        args.num_defaults, args.output_dir, args.vs_strategy)

@@ -8,7 +8,7 @@ from examples.evaluate_defaults import run as evaluate_defaults
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--resized_grid_size', type=int, default=16)
-    parser.add_argument('--max_num_defaults', type=int, default=4)
+    parser.add_argument('--max_num_defaults', type=int, default=10)
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--vs_strategy', type=str, default='cpp_bruteforce')
