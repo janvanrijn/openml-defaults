@@ -18,7 +18,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults, c_executable, output_dir):
+def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults, models, output_dir, holdout_indices=[]):
+    if not isinstance(holdout_indices, list):
+        raise ValueError('holdout_indices should be a list')
+
     print(openmldefaults.utils.get_time(), '=== NUM DEFAULTS: %d ===' % num_defaults)
     df = openmldefaults.utils.load_dataset(dataset_path, params, resized_grid_size, flip_performances)
 
@@ -31,9 +34,8 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
     df = df.sort_values(by=['sum_of_columns'])
     del df['sum_of_columns']
 
-    models = [openmldefaults.models.CppDefaults(c_executable, True),
-              openmldefaults.models.GreedyDefaults(),
-              openmldefaults.models.MipDefaults('GLPK_CMD')]
+    for column in df.columns.values[holdout_indices]:
+        del df[column]
 
     results = {}
 
@@ -43,9 +45,12 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
         dataset_dir = os.path.basename(dataset_path)
         setup_dir = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
         experiment_dir = os.path.join(output_dir, dataset_dir, solver_dir, setup_dir)
+        if len(holdout_indices) > 0:
+            experiment_dir = os.path.join(experiment_dir, str(sorted(holdout_indices)))
         experiment_file = os.path.join(experiment_dir, 'results.pkl')
         if os.path.isfile(experiment_file):
             with open(experiment_file, 'rb') as fp:
+                print(openmldefaults.utils.get_time(), 'Already exists')
                 results[model.name] = pickle.load(fp)
                 continue
 
@@ -70,5 +75,12 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
 
 if __name__ == '__main__':
     args = parse_args()
+
+    models = [
+        openmldefaults.models.CppDefaults(args.c_executable, True),
+        openmldefaults.models.GreedyDefaults(),
+        # openmldefaults.models.MipDefaults('GLPK_CMD')
+    ]
+
     run(args.dataset_path, args.flip_performances, args.params, args.resized_grid_size, args.num_defaults,
-        args.c_executable, args.output_dir)
+        models, args.output_dir)

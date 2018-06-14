@@ -3,7 +3,7 @@ import pandas as pd
 import unittest
 
 
-class TestMiscFunctions(unittest.TestCase):
+class TestParetoFunctions(unittest.TestCase):
 
     def test_simple_cull(self):
         def dominates(dominater, dominated):

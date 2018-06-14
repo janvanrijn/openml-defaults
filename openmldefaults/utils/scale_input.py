@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 def selected_set(df: pd.DataFrame, defaults: List[Tuple]):
     # filters out only the algorithms that we have in the 'set of defaults'
-    df = df.loc[defaults]
+    df = df.loc[list(defaults)]
     # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
     # then we take the median of this
     return df.min(axis=0)

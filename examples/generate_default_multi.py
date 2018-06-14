@@ -1,4 +1,5 @@
 import argparse
+import openmldefaults
 import os
 
 from examples.generate_defaults import run as generate_defaults
@@ -16,6 +17,8 @@ def parse_args():
 
 
 if __name__ == '__main__':
+    args = parse_args()
+
     datasets = [
         (os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather',
          os.path.expanduser('~') + '/data/openml-defaults/test_svm.feather',
@@ -26,7 +29,13 @@ if __name__ == '__main__':
          True,
          ['kernel_rbf', 'kernel_poly', 'kernel_linear', 'c', 'gamma', 'degree'])
     ]
-    args = parse_args()
+
+    models = [
+        openmldefaults.models.CppDefaults(args.c_executable, True),
+        openmldefaults.models.GreedyDefaults(),
+        openmldefaults.models.MipDefaults('GLPK_CMD')
+    ]
+
     for num_defaults in range(1, args.max_num_defaults + 1):
         for (dataset_train_path, dataset_test_path, flip_performances, params) in datasets:
             generate_defaults(dataset_train_path, flip_performances, params, args.resized_grid_size, num_defaults,
