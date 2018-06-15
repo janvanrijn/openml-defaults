@@ -1,4 +1,5 @@
 import argparse
+import collections
 import matplotlib.pyplot as plt
 import numpy as np
 import openmldefaults
@@ -10,12 +11,11 @@ import pickle
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_train_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather')
-    parser.add_argument('--dataset_test_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/test_svm.feather')
-    parser.add_argument('--flip_performances', action='store_true')
+                        default=os.path.expanduser('~') + '/data/openml-defaults/svm-ongrid.arff')
+    parser.add_argument('--flip_performances', action='store_true', default=True)
     parser.add_argument('--resized_grid_size', type=int, default=16)
-    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
+    parser.add_argument('--cv_iterations', type=int, default=10)
+    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
     parser.add_argument('--restricted_num_tasks', type=int, default=None)
@@ -62,12 +62,11 @@ def plot(data, title, output_file):
     plt.close()
 
 
-def run(dataset_train_path, dataset_test_path, flip_performances, params, resized_grid_size, num_defaults, output_dir, vs_strategy):
-    frames = dict()
-    frames['train'] = openmldefaults.utils.load_dataset(dataset_train_path, params, None, flip_performances)
+def run(dataset_train_path, cv_iterations, flip_performances, params, resized_grid_size, num_defaults, output_dir, vs_strategy):
+    if not isinstance(cv_iterations, int):
+        raise ValueError()
 
-    if dataset_test_path is not None:
-        frames['test'] = openmldefaults.utils.load_dataset(dataset_test_path, params, None, flip_performances)
+    df = openmldefaults.utils.load_dataset(dataset_train_path, params, None, flip_performances)
 
     train_data_name = os.path.basename(dataset_train_path)
     data_dir = os.path.join(output_dir, train_data_name)
@@ -76,41 +75,57 @@ def run(dataset_train_path, dataset_test_path, flip_performances, params, resize
         raise ValueError('dir does not exists: %s' % data_dir)
 
     setup_name = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
-    results = dict()
-    runtime = {'train': dict()}
+    results = {'train': collections.defaultdict(list), 'test': collections.defaultdict(list)}
+    runtime = {'train': collections.defaultdict(list)}
     for strategy in os.listdir(data_dir):
         setup_dir = os.path.join(data_dir, strategy, setup_name)
+
         if os.path.isdir(setup_dir):
-            results_file = os.path.join(setup_dir, 'results.pkl')
-            with open(results_file, 'rb') as fp:
-                strategy_results = pickle.load(fp)
 
-            for eval_frame, df in frames.items():
-                if eval_frame not in results:
-                    results[eval_frame] = dict()
-                results[eval_frame][strategy] = openmldefaults.utils.selected_set(df, strategy_results['defaults']).values
-            runtime['train'][strategy] = strategy_results['run_time']
+            for cv_iteration in range(cv_iterations):
+                holdout_task = openmldefaults.utils.get_cv_indices(len(df.columns), cv_iterations, cv_iteration)
+                iteration_dir = os.path.join(setup_dir, )
 
-    for eval_frame, df in frames.items():
-        for budget in range(4, 0, -1):
-            results[eval_frame]['random_search_budget_x%d' % budget] = simulate_random_search(df, num_defaults * budget, 100)
+                results_file = os.path.join(iteration_dir, 'results.pkl')
+                with open(results_file, 'rb') as fp:
+                    strategy_results = pickle.load(fp)
+                    te_scores = openmldefaults.utils.selected_set(df, strategy_results['defaults'], holdout_task).values
+                    tr_scores = openmldefaults.utils.selected_set(df, strategy_results['defaults']).values
+
+                    results['test'][strategy].extend(te_scores)
+                    results['train'][strategy].extend(tr_scores)
+                runtime['train'][strategy] = strategy_results['run_time']
+
+    for budget in range(4, 0, -1):
+        random_search_train = list(simulate_random_search(df, num_defaults * budget, 100)) * cv_iterations
+        random_search_test = simulate_random_search(df, num_defaults * budget, 100)
+
+        results['train']['random_search_budget_x%d' % budget] = random_search_train
+        results['test']['random_search_budget_x%d' % budget] = random_search_test
 
     title = '%s (%d defaults)' % (os.path.basename(dataset_train_path), num_defaults)
     plot(results, title, os.path.join(output_dir, 'absolute_%s_%s.png' % (train_data_name, setup_name)))
     plot(runtime, title, os.path.join(output_dir, 'runtime_%s_%s.png' % (train_data_name, setup_name)))
 
     results_relative = dict()
-    for eval_frame, df in frames.items():
-        results_relative[eval_frame] = dict()
-        for strategy in results[eval_frame]:
+    for eval_type in results.keys():
+        results_relative[eval_type] = dict()
+        for strategy in results[eval_type]:
             if strategy == vs_strategy:
                 continue
-            current_result = results[eval_frame][vs_strategy] - results[eval_frame][strategy]
-            results_relative[eval_frame]['vs_%s' % strategy] = current_result
+
+            current_result = np.array(results[eval_type][vs_strategy]) - np.array(results[eval_type][strategy])
+            results_relative[eval_type]['vs_%s' % strategy] = current_result
     plot(results_relative, title, os.path.join(output_dir, 'relative_%s_%s.png' % (train_data_name, setup_name)))
 
 
 if __name__ == '__main__':
     args = parse_args()
-    run(args.dataset_train_path, args.dataset_test_path, args.flip_performances, args.params, args.resized_grid_size,
-        args.num_defaults, args.output_dir, args.vs_strategy)
+    run(args.dataset_train_path,
+        args.cv_iterations if args.cv_iterations is not None else [],
+        args.flip_performances,
+        args.params,
+        args.resized_grid_size,
+        args.num_defaults,
+        args.output_dir,
+        args.vs_strategy)

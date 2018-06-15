@@ -1,12 +1,14 @@
 import numpy as np
 import pandas as pd
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 
-def selected_set(df: pd.DataFrame, defaults: List[Tuple]):
+def selected_set(df: pd.DataFrame, defaults: List[Tuple], column_slice: List=None):
     # filters out only the algorithms that we have in the 'set of defaults'
     df = df.loc[list(defaults)]
+    if column_slice is not None:
+        df = df.iloc[:, column_slice]
     # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
     # then we take the median of this
     return df.min(axis=0)
