@@ -41,4 +41,4 @@ if __name__ == '__main__':
             for cv_iteration in cv_iterations:
                 holdout_tasks = openmldefaults.utils.get_cv_indices(num_tasks, args.cv_iterations, cv_iteration)
                 generate_defaults(dataset_train_path, flip_performances, params, args.resized_grid_size, num_defaults,
-                                  args.c_executable, args.output_dir)
+                                  models, args.output_dir)

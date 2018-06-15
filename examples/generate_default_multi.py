@@ -39,6 +39,6 @@ if __name__ == '__main__':
     for num_defaults in range(1, args.max_num_defaults + 1):
         for (dataset_train_path, dataset_test_path, flip_performances, params) in datasets:
             generate_defaults(dataset_train_path, flip_performances, params, args.resized_grid_size, num_defaults,
-                              args.c_executable, args.output_dir)
+                              models, args.output_dir)
             evaluate_defaults(dataset_train_path, dataset_test_path, flip_performances, params, args.resized_grid_size,
                               num_defaults, args.output_dir, args.vs_strategy)
