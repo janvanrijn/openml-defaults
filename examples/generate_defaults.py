@@ -40,7 +40,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
     results = {}
 
     for model in models:
-        print(openmldefaults.utils.get_time(), 'Started on model: %s' % model.name)
+        print(openmldefaults.utils.get_time(), 'Started on model: %s' % model)
         solver_dir = model.name
         dataset_dir = os.path.basename(dataset_path)
         setup_dir = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
