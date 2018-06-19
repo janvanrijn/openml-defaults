@@ -1,5 +1,6 @@
 import argparse
 import ConfigSpace
+import numpy as np
 import openml
 import openmlcontrib
 import openmldefaults
@@ -25,6 +26,43 @@ def parse_args():
     parser.add_argument('--openml_apikey', type=str, default=None, help='the apikey to authenticate to OpenML')
     parser.add_argument('--num_tasks', type=int, default=None, help='limit number of tasks (for testing)')
     return parser.parse_args()
+
+
+def generate_configurations(config_space, current_index, max_values_per_parameter):
+    if current_index >= len(config_space.get_hyperparameters()):
+        return [{}]
+    else:
+        current_hyperparameter = config_space.get_hyperparameter(config_space.get_hyperparameter_by_idx(current_index))
+        if isinstance(current_hyperparameter, ConfigSpace.CategoricalHyperparameter):
+            current_values = current_hyperparameter.choices
+        elif isinstance(current_hyperparameter, ConfigSpace.UniformFloatHyperparameter):
+            if current_hyperparameter.log:
+                current_values = np.logspace(np.log(current_hyperparameter.lower),
+                                             np.log(current_hyperparameter.upper),
+                                             num=max_values_per_parameter,
+                                             base=np.e)
+            else:
+                current_values = np.linspace(current_hyperparameter.lower, current_hyperparameter.upper,
+                                             num=max_values_per_parameter)
+        elif isinstance(current_hyperparameter, ConfigSpace.UniformIntegerHyperparameter):
+            possible_values = current_hyperparameter.upper - current_hyperparameter.lower + 1
+            if current_hyperparameter.log:
+                current_values = np.logspace(np.log(current_hyperparameter.lower),
+                                             np.log(current_hyperparameter.upper),
+                                             num=min(max_values_per_parameter, possible_values),
+                                             base=np.e)
+            else:
+                current_values = np.linspace(current_hyperparameter.lower, current_hyperparameter.upper,
+                                             num=min(max_values_per_parameter, possible_values))
+            current_values = [np.round(val) for val in list(current_values)]
+        elif isinstance(current_hyperparameter, ConfigSpace.UnParametrizedHyperparameter):
+            current_values = [current_hyperparameter.value]
+        else:
+            raise ValueError('Could not determine hyperparameter: %s' % current_hyperparameter.name)
+
+        print(current_hyperparameter.name, current_values)
+        generate_configurations(config_space, current_index+1, max_values_per_parameter)
+
 
 
 def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, cache_directory):
@@ -73,6 +111,8 @@ def run(args):
         config_space = openmldefaults.config_spaces.get_libsvm_svc_default_search_space()
     else:
         raise ValueError('classifier type not recognized')
+
+    configurations = generate_configurations(config_space, 0, 16)
 
     print(study.tasks)
     for task_id in study.tasks:
