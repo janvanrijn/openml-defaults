@@ -84,7 +84,7 @@ def run(dataset_train_path, cv_iterations, flip_performances, params, resized_gr
 
             for cv_iteration in range(cv_iterations):
                 holdout_task = openmldefaults.utils.get_cv_indices(len(df.columns), cv_iterations, cv_iteration)
-                iteration_dir = os.path.join(setup_dir, )
+                iteration_dir = os.path.join(setup_dir, str(sorted(holdout_task)))
 
                 results_file = os.path.join(iteration_dir, 'results.pkl')
                 with open(results_file, 'rb') as fp:
