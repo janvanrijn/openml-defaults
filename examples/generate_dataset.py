@@ -136,7 +136,7 @@ def run(args):
                                                        'Generated using OpenML-defaults')
     with open(os.path.join(args.output_directory, 'aurrogate_%s_c%d.arff' % (args.classifier,
                                                                              args.resized_grid_size)), 'w') as fp:
-        arff.dump(fp, arff_object)
+        arff.dump(arff_object, fp)
 
 
 if __name__ == '__main__':
