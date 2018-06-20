@@ -52,10 +52,11 @@ def generate_configurations(config_space, current_index, max_values_per_paramete
                 current_values = np.linspace(current_hyperparameter.lower, current_hyperparameter.upper,
                                              num=min(max_values_per_parameter, possible_values))
             current_values = [np.round(val) for val in list(current_values)]
-        elif isinstance(current_hyperparameter, ConfigSpace.UnParametrizedHyperparameter):
+        elif isinstance(current_hyperparameter, ConfigSpace.UnParametrizedHyperparameter) or \
+                isinstance(current_hyperparameter, ConfigSpace.Constant):
             current_values = [current_hyperparameter.value]
         else:
-            raise ValueError('Could not determine hyperparameter: %s' % current_hyperparameter.name)
+            raise ValueError('Could not determine hyperparameter type: %s' % current_hyperparameter.name)
 
         result = []
         recursive_configs = generate_configurations(config_space, current_index+1, max_values_per_parameter)
@@ -122,8 +123,12 @@ def run(args):
 
     df_surrogate = df_orig.copy()
     for task_id in study.tasks:
-        estimator, columns = train_surrogate_on_task(task_id, flow_id, args.num_runs,
-                                                     config_space, args.scoring, args.cache_directory)
+        try:
+            estimator, columns = train_surrogate_on_task(task_id, flow_id, args.num_runs,
+                                                         config_space, args.scoring, args.cache_directory)
+        except ValueError as e:
+            print('Error at task %d: %s' % (task_id, e))
+            continue
         if not np.array_equal(df_orig.columns.values, columns):
             raise ValueError()
         surrogate_values = estimator.predict(pd.get_dummies(df_orig).as_matrix())
