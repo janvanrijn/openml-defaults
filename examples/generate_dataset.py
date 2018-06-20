@@ -1,3 +1,4 @@
+import arff
 import argparse
 import ConfigSpace
 import numpy as np
@@ -20,11 +21,7 @@ def parse_args():
     parser.add_argument('--classifier', type=str, default='libsvm_svc', help='openml flow id')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--num_runs', type=int, default=500, help='max runs to obtain from openml')
-    parser.add_argument('--normalize', action='store_true', help='normalizes y values per task')
-    parser.add_argument('--prevent_model_cache', action='store_true', help='prevents loading old models from cache')
-    parser.add_argument('--openml_server', type=str, default=None, help='the openml server location')
-    parser.add_argument('--openml_apikey', type=str, default=None, help='the apikey to authenticate to OpenML')
-    parser.add_argument('--num_tasks', type=int, default=None, help='limit number of tasks (for testing)')
+    parser.add_argument('--resized_grid_size', type=int, default=4)
     return parser.parse_args()
 
 
@@ -60,9 +57,15 @@ def generate_configurations(config_space, current_index, max_values_per_paramete
         else:
             raise ValueError('Could not determine hyperparameter: %s' % current_hyperparameter.name)
 
-        print(current_hyperparameter.name, current_values)
-        generate_configurations(config_space, current_index+1, max_values_per_parameter)
-
+        result = []
+        recursive_configs = generate_configurations(config_space, current_index+1, max_values_per_parameter)
+        for recursive_config in recursive_configs:
+            for i in range(len(current_values)):
+                current_value = current_values[i]
+                cp = dict(recursive_config)
+                cp[current_hyperparameter.name] = current_value
+                result.append(cp)
+        return result
 
 
 def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, cache_directory):
@@ -75,6 +78,7 @@ def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, c
                                                                        parameter_field='parameter_name',
                                                                        evaluation_measure=scoring,
                                                                        cache_directory=cache_directory)
+
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
         if isinstance(hyperparameter, ConfigSpace.CategoricalHyperparameter):
@@ -94,7 +98,7 @@ def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, c
         ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64))
     ])
     surrogate.fit(pd.get_dummies(setup_data).as_matrix(), y)
-    return surrogate
+    return surrogate, setup_data.columns.values
 
 
 def run(args):
@@ -112,12 +116,27 @@ def run(args):
     else:
         raise ValueError('classifier type not recognized')
 
-    configurations = generate_configurations(config_space, 0, 16)
+    num_params = len(config_space.get_hyperparameter_names())
+    configurations = generate_configurations(config_space, 0, args.resized_grid_size)
+    df_orig = pd.DataFrame(configurations)
 
-    print(study.tasks)
+    df_surrogate = df_orig.copy()
     for task_id in study.tasks:
-        estimator = train_surrogate_on_task(task_id, flow_id, args.num_runs,
-                                            config_space, args.scoring, args.cache_directory)
+        estimator, columns = train_surrogate_on_task(task_id, flow_id, args.num_runs,
+                                                     config_space, args.scoring, args.cache_directory)
+        if not np.array_equal(df_orig.columns.values, columns):
+            raise ValueError()
+        surrogate_values = estimator.predict(pd.get_dummies(df_orig).as_matrix())
+        df_surrogate['%s_task_%d' % (args.scoring, task_id)] = surrogate_values
+
+    if df_surrogate.shape != (len(configurations), num_params+len(study.tasks)):
+        raise ValueError()
+    os.makedirs(args.output_directory, exist_ok=True)
+    arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate, 'surrogate_%s' % args.classifier,
+                                                       'Generated using OpenML-defaults')
+    with open(os.path.join(args.output_directory, 'aurrogate_%s_c%d.arff' % (args.classifier,
+                                                                             args.resized_grid_size)), 'w') as fp:
+        arff.dump(fp, arff_object)
 
 
 if __name__ == '__main__':

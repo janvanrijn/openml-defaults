@@ -18,7 +18,6 @@ def parse_args():
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--params', type=str, nargs='+', required=True)
-    parser.add_argument('--restricted_num_tasks', type=int, default=None)
     parser.add_argument('--num_defaults', type=int, default=3)
     parser.add_argument('--vs_strategy', type=str, default='cpp_bruteforce')
     return parser.parse_args()
