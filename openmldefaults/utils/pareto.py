@@ -8,6 +8,7 @@ def dominates_min(dominater, dominated):
 
 # fn from: http://code.activestate.com/recipes/578287-multidimensional-pareto-front/
 def simple_cull(original_frame: pd.DataFrame, dominates: Callable):
+    len_original_frame = len(original_frame)
     # copies the frame. contains the same number of rows (filled with na's) should be removed later
     pareto_frame = pd.DataFrame(data=None, columns=original_frame.columns, index=original_frame.index)
     dominated_frame = pd.DataFrame(data=None, columns=original_frame.columns, index=original_frame.index)
@@ -43,4 +44,13 @@ def simple_cull(original_frame: pd.DataFrame, dominates: Callable):
 
         if len(original_frame) == 0:
             break
-    return pareto_frame.dropna(), dominated_frame.dropna()
+
+    pareto_frame = pareto_frame.dropna()
+    dominated_frame = dominated_frame.dropna()
+
+    if len(pareto_frame) + len(dominated_frame) != len_original_frame:
+        raise ValueError('Original frame has %d rows. Pareto %d, Dominated %d' % (len_original_frame,
+                                                                                  len(pareto_frame),
+                                                                                  len(dominated_frame)))
+
+    return pareto_frame, dominated_frame
