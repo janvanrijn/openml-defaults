@@ -15,13 +15,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--cache_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml_cache',
                         help='directory to store cache')
-    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml_cache',
+    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults',
                         help='directory to store output')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--classifier', type=str, default='libsvm_svc', help='openml flow id')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--num_runs', type=int, default=500, help='max runs to obtain from openml')
-    parser.add_argument('--resized_grid_size', type=int, default=4)
+    parser.add_argument('--resized_grid_size', type=int, default=16)
     return parser.parse_args()
 
 

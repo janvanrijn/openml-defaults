@@ -69,9 +69,24 @@ def run(args):
 
             for name, df in category_df.items():
                 current = df.reset_index()
-                x_series_dominated = current[plot_params[i]]
-                y_series_dominated = current[plot_params[j]]
-                plot_numeric(current_ax, name, x_series_dominated, y_series_dominated)
+                x_series = current[plot_params[i]]
+                y_series = current[plot_params[j]]
+
+                x_numeric = np.issubdtype(x_series.dtype, np.number)
+                y_numeric = np.issubdtype(y_series.dtype, np.number)
+
+                if x_numeric and y_numeric:
+                    plot_numeric(current_ax, name, x_series, y_series)
+                elif x_numeric:
+                    print(y_series)
+                    raise ValueError('Non numeric column: %s' % (plot_params[j]))
+                elif y_numeric:
+                    print(x_series)
+                    raise ValueError('Non numeric column: %s' % (plot_params[i]))
+                else:
+                    print(x_series)
+                    print(y_series)
+                    raise ValueError('Non numeric columns: %s, %s' % (plot_params[i], plot_params[j]))
 
     axes[0, 0].legend()
     plt.tight_layout()
