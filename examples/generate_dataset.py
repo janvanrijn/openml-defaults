@@ -1,6 +1,7 @@
 import arff
 import argparse
 import ConfigSpace
+import json
 import numpy as np
 import openml
 import openmlcontrib
@@ -107,15 +108,14 @@ def run(args):
 
     if args.classifier == 'random_forest':
         flow_id = 6969
-        config_space = openmldefaults.config_spaces.get_random_forest_default_search_space()
     elif args.classifier == 'adaboost':
         flow_id = 6970
-        config_space = openmldefaults.config_spaces.get_adaboost_default_search_space()
     elif args.classifier == 'libsvm_svc':
         flow_id = 7707
-        config_space = openmldefaults.config_spaces.get_libsvm_svc_default_search_space()
     else:
         raise ValueError('classifier type not recognized')
+    config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % args.classifier)()
+    meta_data = {'flow_id': flow_id, 'classifier': args.classifier}
 
     num_params = len(config_space.get_hyperparameter_names())
     configurations = generate_configurations(config_space, 0, args.resized_grid_size)
@@ -134,11 +134,18 @@ def run(args):
         surrogate_values = estimator.predict(pd.get_dummies(df_orig).as_matrix())
         df_surrogate['%s_task_%d' % (args.scoring, task_id)] = surrogate_values
 
-    if df_surrogate.shape != (len(configurations), num_params+len(study.tasks)):
-        raise ValueError()
+    if df_surrogate.shape[0] != len(configurations):
+        raise ValueError('surrogate frame has wrong number of instances. Expected: %d Got %d' % (len(configurations),
+                                                                                                 df_surrogate.shape[0]))
+
+    if df_surrogate.shape[1] > num_params + len(study.tasks):
+        raise ValueError('surrogate frame has too much of columns. Max: %d Got %d' % (num_params + len(study.tasks),
+                                                                                      df_surrogate.shape[1]))
+    if df_surrogate.shape[1] < num_params + len(study.tasks) / 2:
+        raise ValueError('surrogate frame has too few columns. Min: %d Got %d' % (num_params + len(study.tasks) / 2,
+                                                                                  df_surrogate.shape[1]))
     os.makedirs(args.output_directory, exist_ok=True)
-    arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate, 'surrogate_%s' % args.classifier,
-                                                       'Generated using OpenML-defaults')
+    arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate, 'surrogate_%s' % args.classifier, json.dumps(meta_data))
     with open(os.path.join(args.output_directory, 'surrogate_%s_c%d.arff' % (args.classifier,
                                                                              args.resized_grid_size)), 'w') as fp:
         arff.dump(arff_object, fp)
