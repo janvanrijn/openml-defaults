@@ -49,7 +49,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
             experiment_dir = os.path.join(experiment_dir, str(sorted(holdout_indices)))
         print(openmldefaults.utils.get_time(), 'Output directory: %s' % experiment_dir)
 
-        experiment_file = os.path.join(experiment_dir, 'results.pkl')
+        experiment_file = os.path.join(experiment_dir, 'generated_defaults.pkl')
         if os.path.isfile(experiment_file):
             with open(experiment_file, 'rb') as fp:
                 print(openmldefaults.utils.get_time(), 'Already exists')
