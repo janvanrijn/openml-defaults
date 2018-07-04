@@ -33,7 +33,7 @@ if __name__ == '__main__':
     models = [
         openmldefaults.models.CppDefaults(args.c_executable, True),
         openmldefaults.models.GreedyDefaults(),
-        openmldefaults.models.MipDefaults('GLPK_CMD')
+        # openmldefaults.models.MipDefaults('GLPK_CMD')
     ]
 
     for num_defaults in range(1, args.max_num_defaults + 1):

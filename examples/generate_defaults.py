@@ -81,7 +81,7 @@ if __name__ == '__main__':
     models = [
         openmldefaults.models.CppDefaults(args.c_executable, True),
         openmldefaults.models.GreedyDefaults(),
-        openmldefaults.models.MipDefaults('GLPK_CMD')
+        # openmldefaults.models.MipDefaults('GLPK_CMD')
     ]
 
     run(args.dataset_path, args.flip_performances, args.params, args.resized_grid_size, args.num_defaults,
