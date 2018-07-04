@@ -97,7 +97,7 @@ def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, c
     # TODO: HPO
     surrogate = sklearn.pipeline.Pipeline(steps=[
         ('imputer', sklearn.preprocessing.Imputer(strategy='median')),
-        ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64))
+        ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64, random_state=42))
     ])
     surrogate.fit(pd.get_dummies(setup_data).as_matrix(), y)
     return surrogate, setup_data.columns.values
