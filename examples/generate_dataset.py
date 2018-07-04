@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults',
                         help='directory to store output')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
-    parser.add_argument('--classifier', type=str, default='libsvm_svc', help='openml flow id')
+    parser.add_argument('--classifier', type=str, default='libsvm_svc', help='scikit-learn flow name')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--num_runs', type=int, default=500, help='max runs to obtain from openml')
     parser.add_argument('--resized_grid_size', type=int, default=16)
@@ -83,7 +83,7 @@ def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, c
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
         if isinstance(hyperparameter, ConfigSpace.CategoricalHyperparameter):
-            for value in hyperparameter.values:
+            for value in hyperparameter.choices:
                 num_occurances = len(setup_data.loc[setup_data[hyperparameter.name] == value])
                 if num_occurances < nominal_values_min:
                     raise ValueError('Nominal hyperparameter %s value %s does not have' % (hyperparameter.name, value) +
@@ -139,7 +139,7 @@ def run(args):
     os.makedirs(args.output_directory, exist_ok=True)
     arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate, 'surrogate_%s' % args.classifier,
                                                        'Generated using OpenML-defaults')
-    with open(os.path.join(args.output_directory, 'aurrogate_%s_c%d.arff' % (args.classifier,
+    with open(os.path.join(args.output_directory, 'surrogate_%s_c%d.arff' % (args.classifier,
                                                                              args.resized_grid_size)), 'w') as fp:
         arff.dump(arff_object, fp)
 
