@@ -60,21 +60,24 @@ class MipDefaults(object):
             raise Exception('Solver had error: %s' % pulp.LpStatus[mip_optimizer.status])
 
         # now gather the defaults
-        defaults = []
+        selected_indices = []
         # Each of the variables is printed with it's resolved optimum value
         for variable in mip_optimizer.variables():
             if variable.name.startswith('config_'):
                 if variable.varValue == 1:
                     index = int(variable.name.split('config_')[1])
                     config = df.index.values[index]
-                    defaults.append(config)
+                    selected_indices.append(config)
+
+        print(openmldefaults.utils.get_time(), selected_indices)
 
         # we must also recalculate the objective, due to the scaling
-        result_frame = openmldefaults.utils.selected_set(df, defaults)
+        result_frame = openmldefaults.utils.selected_set(df, selected_indices)
 
         results_dict = {
+            # 'defaults': set(selected_defaults),
+            'indices': set(selected_indices),
             'objective': sum(result_frame),
             'run_time': runtime,
-            'defaults': set(defaults),
         }
         return results_dict

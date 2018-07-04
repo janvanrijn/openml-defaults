@@ -61,7 +61,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
         with open(experiment_file, 'wb') as fp:
             pickle.dump(results_dict, fp)
 
-        sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['defaults']))
+        sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['indices']))
         diff = abs(sum_of_scores - results_dict['objective'])
         assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores,
                                                                                             results_dict['score'])
@@ -72,7 +72,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
     if 'cpp_bruteforce' in results and 'mip' in results:
         diff = abs(results['cpp_bruteforce']['objective'] - results['mip']['objective'])
         assert diff < 0.0001
-        assert set(results['cpp_bruteforce']['defaults']) == set(results['mip']['defaults'])
+        assert set(results['cpp_bruteforce']['indices']) == set(results['mip']['indices'])
 
 
 if __name__ == '__main__':
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     models = [
         openmldefaults.models.CppDefaults(args.c_executable, True),
         openmldefaults.models.GreedyDefaults(),
-        # openmldefaults.models.MipDefaults('GLPK_CMD')
+        openmldefaults.models.MipDefaults('GLPK_CMD')
     ]
 
     run(args.dataset_path, args.flip_performances, args.params, args.resized_grid_size, args.num_defaults,

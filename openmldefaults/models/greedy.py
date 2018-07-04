@@ -27,12 +27,14 @@ class GreedyDefaults(object):
             selected_configs.append(best_addition)
             selected_indices.append(best_index)
 
-        print(openmldefaults.utils.get_time(), {'solution': sorted(selected_indices), 'score': best_score})
+        selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx) for idx in selected_indices]
+        print(openmldefaults.utils.get_time(), selected_defaults)
 
         runtime = time.time() - start_time
         results_dict = {
+            'defaults': selected_defaults,
+            'indices': selected_configs,
             'objective': best_score,
             'run_time': runtime,
-            'defaults': selected_configs
         }
         return results_dict

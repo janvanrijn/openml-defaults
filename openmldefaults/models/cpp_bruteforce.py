@@ -36,21 +36,26 @@ class CppDefaults(object):
             raise ValueError('Process terminated with non-zero exit code. Stderr: ' + err)
         print(openmldefaults.utils.get_time(), 'Runtime: %d seconds' % runtime)
 
+        solution = None
         for idx, line in enumerate(out.split("\n")):
             try:
                 solution = json.loads(line)
             except json.decoder.JSONDecodeError:
                 raise ValueError('Could not parse result as json: %s' % line)
+        if solution is None:
+            raise ValueError('Did not interpret solution correctly')
 
-        print(openmldefaults.utils.get_time(), solution)
-        selected_defaults = {df.index[idx] for idx in solution['solution']}
+        selected_indices = {df.index[idx] for idx in solution['solution']}
+        selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx) for idx in solution['solution']]
+        print(openmldefaults.utils.get_time(), selected_defaults)
 
         results_dict = {
+            'branch_and_bound': solution['branch_and_bound'],
+            'defaults': selected_defaults,
+            'indices': selected_indices,
+            'leafs_visited': solution['leafs_visited'],
+            'nodes_visited': solution['nodes_visited'],
             'objective': solution['score'],
             'run_time': runtime,
-            'defaults': selected_defaults,
-            'nodes_visited': solution['nodes_visited'],
-            'leafs_visited': solution['leafs_visited'],
-            'branch_and_bound': solution['branch_and_bound']
         }
         return results_dict
