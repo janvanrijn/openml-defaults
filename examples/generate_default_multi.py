@@ -20,10 +20,15 @@ if __name__ == '__main__':
     args = parse_args()
 
     datasets = [
-        (os.path.expanduser('~') + '/data/openml-defaults/train_svm.feather',
-         os.path.expanduser('~') + '/data/openml-defaults/test_svm.feather',
-         False,
-         ['kernel', 'cost', 'gamma', 'degree']),
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c16.arff',
+         None,
+         True,
+         ['algorithm', 'learning_rate', 'max_depth', 'n_estimators', 'imputation__strategy']),
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_random_forest_c16.arff',
+         None,
+         True,
+         ['bootstrap', 'criterion', 'max_depth', 'max_features', 'max_leaf_nodes', 'min_samples_leaf',
+          'min_samples_split', 'min_weight_fraction_leaf', 'n_estimators', 'imputation__strategy']),
         (os.path.expanduser('~') + '/data/openml-defaults/svm-ongrid.arff',
          None,
          True,
