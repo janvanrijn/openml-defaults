@@ -8,7 +8,7 @@ from examples.evaluate_defaults import run as evaluate_defaults
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resized_grid_size', type=int, default=16)
+    parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--max_num_defaults', type=int, default=10)
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
@@ -20,11 +20,11 @@ if __name__ == '__main__':
     args = parse_args()
 
     datasets = [
-        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c16.arff',
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c8.arff',
          None,
          True,
-         ['algorithm', 'learning_rate', 'max_depth', 'n_estimators', 'imputation__strategy']),
-        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_random_forest_c16.arff',
+         ['algorithm', 'learning_rate', 'classifier__max_depth', 'n_estimators', 'imputation__strategy']),
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_random_forest_c8.arff',
          None,
          True,
          ['bootstrap', 'criterion', 'max_depth', 'max_features', 'max_leaf_nodes', 'min_samples_leaf',
