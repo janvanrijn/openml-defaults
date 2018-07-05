@@ -1,6 +1,7 @@
 import arff
 import argparse
 import json
+import numpy as np
 import openml
 import openmldefaults
 import os
@@ -19,6 +20,19 @@ def parse_args():
     parser.add_argument('--model_name', type=str, default='greedy')
     parser.add_argument('--defaults_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
+
+
+def defaults_to_native_python(defaults):
+    for idx, default in enumerate(defaults):
+        for param, value in default.items():
+            if np.issubdtype(type(value), np.number):
+                if np.issubdtype(value, np.int):
+                    defaults[idx][param] = int(value)
+                elif np.issubdtype(type(value), np.float):
+                    defaults[idx][param] = float(value)
+                else:
+                    raise ValueError()
+    return defaults
 
 
 def run(args):
@@ -71,6 +85,7 @@ def run(args):
 
     default_dir_specific = os.path.join(output_dir, 'default_search')
     if not os.path.isdir(default_dir_specific):
+        generated_defaults = defaults_to_native_python(generated_defaults)
         search = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
         run = openml.runs.run_model_on_task(search, task)
         run.to_filesystem(default_dir_specific)
@@ -83,8 +98,6 @@ def run(args):
         search = sklearn.model_selection.RandomizedSearchCV(estimator, param_grid, args.num_defaults * i)
         run = openml.runs.run_model_on_task(search, task)
         run.to_filesystem(output_dir_specific)
-
-    pass
 
 
 if __name__ == '__main__':

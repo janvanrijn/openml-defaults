@@ -27,18 +27,10 @@ def get_meta_data_config_space(meta_data):
 def cast_columns_of_dataframe(df, params, meta_data):
     config_space = get_meta_data_config_space(meta_data)
     for param in params:
-        # TODO: bad mapping. Re-engineer
-        hyperparameter = None
-        for cs_param in config_space.get_hyperparameters():
-            if param.endswith(cs_param.name) and hyperparameter is None:
-                hyperparameter = cs_param
-            elif param.endswith(cs_param.name):
-                raise ValueError('Multiple candidate parameters for: %s' % param)
-        if hyperparameter is None:
-            raise ValueError('No candidate parameters for: %s' % param)
+        hyperparameter = config_space.get_hyperparameter(param)
 
         if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter):
-            df[param] = df[param].astype(np.int64)
+            df[param] = df[param].astype(int)
     return df
 
 
