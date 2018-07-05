@@ -47,7 +47,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
         solver_dir = model.name
         dataset_dir = os.path.basename(dataset_path)
         setup_dir = openmldefaults.utils.get_setup_dirname(resized_grid_size, num_defaults)
-        experiment_dir = os.path.join(output_dir, dataset_dir, solver_dir, setup_dir)
+        experiment_dir = os.path.join(output_dir, dataset_dir, 'generated_defaults', solver_dir, setup_dir)
         if len(holdout_indices) > 0:
             experiment_dir = os.path.join(experiment_dir, str(sorted(holdout_indices)))
         print(openmldefaults.utils.get_time(), 'Output directory: %s' % experiment_dir)

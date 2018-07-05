@@ -21,4 +21,4 @@ class TestCvFunctions(unittest.TestCase):
         search = openmldefaults.search.DefaultSearchCV(estimator, defaults)
         search.fit(X, y)
 
-        self.assertListEqual(search.cv_results_['params'], defaults)
+        self.assertListEqual(list(search.cv_results_['params']), defaults)

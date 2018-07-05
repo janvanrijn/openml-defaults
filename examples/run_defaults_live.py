@@ -11,12 +11,12 @@ import sklearn
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c16.arff')
+                        default=os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c8.arff')
     parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--dataset_prefix', type=str, default='predictive_accuracy_task_')
-    parser.add_argument('--resized_grid_size', type=int, default=16)
-    parser.add_argument('--num_defaults', type=int, default=3)
-    parser.add_argument('--model_name', type=str, default='cpp_bruteforce')
+    parser.add_argument('--resized_grid_size', type=int, default=8)
+    parser.add_argument('--num_defaults', type=int, default=1)
+    parser.add_argument('--model_name', type=str, default='greedy')
     parser.add_argument('--defaults_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
 
@@ -35,7 +35,7 @@ def run(args):
     solver_dir = args.model_name
     dataset_dir = os.path.basename(args.dataset_path)
     setup_dir = openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults)
-    configuration_dir = os.path.join(args.defaults_dir, dataset_dir, solver_dir, setup_dir)
+    configuration_dir = os.path.join(args.defaults_dir, dataset_dir, 'generated_defaults', solver_dir, setup_dir)
     if not os.path.isdir(configuration_dir):
         raise ValueError('Directory does not exists: %s' % configuration_dir)
     correct_holdout_task_dir = None
@@ -61,7 +61,7 @@ def run(args):
 
     flow = openml.flows.get_flow(meta_data['flow_id'])
     task_id = column_idx_task_id[args.task_idx]
-    task = openml.tasks.get_task()
+    task = openml.tasks.get_task(task_id)
     estimator = openml.flows.flow_to_sklearn(flow)
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
     param_grid = openmldefaults.search.config_space_to_dist(config_space)
@@ -69,7 +69,20 @@ def run(args):
     output_dir = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', solver_dir, setup_dir, str(task_id))
     os.makedirs(output_dir, exist_ok=True)
 
-    search_x1 = sklearn.model_selection.RandomSearchCV(estimator, param_grid, args.n_defaults)
+    default_dir_specific = os.path.join(output_dir, 'default_search')
+    if not os.path.isdir(default_dir_specific):
+        search = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
+        run = openml.runs.run_model_on_task(search, task)
+        run.to_filesystem(default_dir_specific)
+
+    for i in range(1, 5):
+        output_dir_specific = os.path.join(output_dir, 'random_search_x%d' % i)
+        if os.path.isdir(output_dir_specific) and len(os.listdir(output_dir_specific)) > 0:
+            print('output dir already has content')
+            continue
+        search = sklearn.model_selection.RandomizedSearchCV(estimator, param_grid, args.num_defaults * i)
+        run = openml.runs.run_model_on_task(search, task)
+        run.to_filesystem(output_dir_specific)
 
     pass
 

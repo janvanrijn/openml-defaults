@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument('--config_space', type=str, default='default', help='config space type')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--num_runs', type=int, default=500, help='max runs to obtain from openml')
-    parser.add_argument('--resized_grid_size', type=int, default=16)
+    parser.add_argument('--resized_grid_size', type=int, default=8)
     return parser.parse_args()
 
 

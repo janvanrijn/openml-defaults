@@ -7,7 +7,7 @@ from examples.generate_defaults import run as generate_defaults
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resized_grid_size', type=int, default=16)
+    parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--max_num_defaults', type=int, default=10)
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--cv_iterations', type=int, default=10)
@@ -25,12 +25,19 @@ if __name__ == '__main__':
         (os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c8.arff',
          100,
          True,
-         ['algorithm', 'learning_rate', 'classifier__max_depth', 'n_estimators', 'imputation__strategy']),
+         ['classifier__algorithm', 'classifier__learning_rate', 'classifier__base_estimator__max_depth',
+          'classifier__n_estimators', 'imputation__strategy']),
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_libsvm_svc_c8.arff',
+         100,
+         True,
+         ['classifier__C', 'classifier__coef0', 'classifier__degree', 'classifier__gamma', 'classifier__kernel',
+          'classifier__max_iter', 'classifier__shrinking', 'imputation__strategy', 'classifier__tol']),
         (os.path.expanduser('~') + '/data/openml-defaults/surrogate_random_forest_c8.arff',
          94,
          True,
-         ['bootstrap', 'criterion', 'max_depth', 'max_features', 'max_leaf_nodes', 'min_samples_leaf',
-          'min_samples_split', 'min_weight_fraction_leaf', 'n_estimators', 'imputation__strategy']),
+         ['classifier__bootstrap', 'classifier__criterion', 'classifier__max_depth', 'classifier__max_features',
+          'classifier__max_leaf_nodes', 'classifier__min_samples_leaf', 'classifier__min_samples_split',
+          'classifier__min_weight_fraction_leaf', 'classifier__n_estimators', 'classifier__imputation__strategy']),
         (os.path.expanduser('~') + '/data/openml-defaults/svm-ongrid.arff',
          50,
          True,
