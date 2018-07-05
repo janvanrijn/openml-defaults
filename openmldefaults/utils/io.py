@@ -1,5 +1,7 @@
 import arff
+import ConfigSpace
 import feather
+import json
 import numpy as np
 import openmldefaults
 import pandas as pd
@@ -12,7 +14,32 @@ def get_setup_dirname(resized_grid_size, num_defaults):
 def print_columns(df, params):
     for param in params:
         unique = np.array(df[param].unique())
-        print(openmldefaults.utils.get_time(), '%s unique values: %s (%d)' % (param, unique, len(unique)))
+        print(openmldefaults.utils.get_time(), '%s (%s) unique values: %s (%d)' % (param, df[param].dtype, unique,
+                                                                                   len(unique)))
+
+
+def get_meta_data_config_space(meta_data):
+    cs_fn = getattr(openmldefaults.config_spaces,
+                    'get_%s_%s_search_space' % (meta_data['classifier'], meta_data['config_space']))
+    return cs_fn()
+
+
+def cast_columns_of_dataframe(df, params, meta_data):
+    config_space = get_meta_data_config_space(meta_data)
+    for param in params:
+        # TODO: bad mapping. Re-engineer
+        hyperparameter = None
+        for cs_param in config_space.get_hyperparameters():
+            if param.endswith(cs_param.name) and hyperparameter is None:
+                hyperparameter = cs_param
+            elif param.endswith(cs_param.name):
+                raise ValueError('Multiple candidate parameters for: %s' % param)
+        if hyperparameter is None:
+            raise ValueError('No candidate parameters for: %s' % param)
+
+        if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter):
+            df[param] = df[param].astype(np.int64)
+    return df
 
 
 def load_dataset(dataset_path, params, resized_grid_size, flip_performances):
@@ -21,8 +48,17 @@ def load_dataset(dataset_path, params, resized_grid_size, flip_performances):
     elif dataset_path.endswith('.arff'):
         with open(dataset_path, 'r') as fp:
             dataset = arff.load(fp)
+            # see if there is meta_data
+            fp.seek(0)
+            try:
+                first_line = fp.readline()
+                meta_data = json.loads(first_line[1:])
+            except json.decoder.JSONDecodeError:
+                meta_data = None
         columns = [column_name for column_name, colum_type in dataset['attributes']]
         df = pd.DataFrame(data=dataset['data'], columns=columns)
+        if meta_data is not None:
+            df = cast_columns_of_dataframe(df, params, meta_data)
     else:
         raise ValueError()
     print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)
