@@ -37,7 +37,7 @@ if __name__ == '__main__':
          True,
          ['classifier__bootstrap', 'classifier__criterion', 'classifier__max_depth', 'classifier__max_features',
           'classifier__max_leaf_nodes', 'classifier__min_samples_leaf', 'classifier__min_samples_split',
-          'classifier__min_weight_fraction_leaf', 'classifier__n_estimators', 'classifier__imputation__strategy']),
+          'classifier__min_weight_fraction_leaf', 'classifier__n_estimators', 'imputation__strategy']),
         (os.path.expanduser('~') + '/data/openml-defaults/svm-ongrid.arff',
          50,
          True,

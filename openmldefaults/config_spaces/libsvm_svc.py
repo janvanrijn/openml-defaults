@@ -15,7 +15,7 @@ def get_libsvm_svc_default_search_space():
     cs = ConfigSpace.ConfigurationSpace()
     cs.add_hyperparameters([imputation, C, kernel, degree, gamma, coef0, shrinking, tol, max_iter])
 
-    degree_depends_on_poly = ConfigSpace.EqualsCondition(degree, kernel, "classifier__poly")
+    degree_depends_on_poly = ConfigSpace.EqualsCondition(degree, kernel, "poly")
     coef0_condition = ConfigSpace.InCondition(coef0, kernel, ["poly", "sigmoid"])
     cs.add_condition(degree_depends_on_poly)
     cs.add_condition(coef0_condition)
