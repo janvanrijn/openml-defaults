@@ -18,16 +18,19 @@ def parse_args():
     return parser.parse_args()
 
 
-def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults, models, output_dir, holdout_indices=[]):
+def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults, models, output_dir,
+        holdout_indices=[], determine_pareto=True):
     if not isinstance(holdout_indices, list):
         raise ValueError('holdout_indices should be a list')
 
     print(openmldefaults.utils.get_time(), '=== NUM DEFAULTS: %d ===' % num_defaults)
     df = openmldefaults.utils.load_dataset(dataset_path, params, resized_grid_size, flip_performances)
 
-    # pareto front
-    df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
-    print(openmldefaults.utils.get_time(), 'Dominated Configurations: %d/%d' % (len(dominated), len(df) + len(dominated)))
+    if determine_pareto:
+        # pareto front
+        df, dominated = openmldefaults.utils.simple_cull(df, openmldefaults.utils.dominates_min)
+        print(openmldefaults.utils.get_time(), 'Dominated Configurations: %d/%d' % (len(dominated),
+                                                                                    len(df) + len(dominated)))
 
     # sort configurations by 'good ones'
     df['sum_of_columns'] = df.apply(lambda row: sum(row), axis=1)
@@ -78,11 +81,11 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
 if __name__ == '__main__':
     args = parse_args()
 
-    models = [
+    models_ = [
         openmldefaults.models.CppDefaults(args.c_executable, True),
         openmldefaults.models.GreedyDefaults(),
         # openmldefaults.models.MipDefaults('GLPK_CMD')
     ]
 
     run(args.dataset_path, args.flip_performances, args.params, args.resized_grid_size, args.num_defaults,
-        models, args.output_dir)
+        models_, args.output_dir)

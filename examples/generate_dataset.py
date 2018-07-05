@@ -20,6 +20,7 @@ def parse_args():
                         help='directory to store output')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--classifier', type=str, default='libsvm_svc', help='scikit-learn flow name')
+    parser.add_argument('--config_space', type=str, default='default', help='config space type')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--num_runs', type=int, default=500, help='max runs to obtain from openml')
     parser.add_argument('--resized_grid_size', type=int, default=16)
@@ -114,8 +115,9 @@ def run(args):
         flow_id = 7707
     else:
         raise ValueError('classifier type not recognized')
-    config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % args.classifier)()
-    meta_data = {'flow_id': flow_id, 'classifier': args.classifier}
+    config_space = getattr(openmldefaults.config_spaces,
+                           'get_%s_%s_search_space' % (args.classifier, args.config_space))()
+    meta_data = {'flow_id': flow_id, 'classifier': args.classifier, 'config_space': args.config_space}
 
     num_params = len(config_space.get_hyperparameter_names())
     configurations = generate_configurations(config_space, 0, args.resized_grid_size)
