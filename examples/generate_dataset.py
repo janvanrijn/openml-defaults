@@ -16,8 +16,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--cache_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml_cache',
                         help='directory to store cache')
-    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults',
-                        help='directory to store output')
+    parser.add_argument('--output_directory', type=str, help='directory to store output',
+                        default=os.path.expanduser('~') + '/experiments/openml-defaults/generated_data/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--classifier', type=str, default='libsvm_svc', help='scikit-learn flow name')
     parser.add_argument('--config_space', type=str, default='default', help='config space type')
@@ -49,10 +49,10 @@ def generate_configurations(config_space, current_index, max_values_per_paramete
                 current_values = np.logspace(np.log(current_hyperparameter.lower),
                                              np.log(current_hyperparameter.upper),
                                              num=min(max_values_per_parameter, possible_values),
-                                             base=np.e)
+                                             base=np.e, dtype=int)
             else:
                 current_values = np.linspace(current_hyperparameter.lower, current_hyperparameter.upper,
-                                             num=min(max_values_per_parameter, possible_values))
+                                             num=min(max_values_per_parameter, possible_values), dtype=int)
             current_values = [np.round(val) for val in list(current_values)]
         elif isinstance(current_hyperparameter, ConfigSpace.UnParametrizedHyperparameter) or \
                 isinstance(current_hyperparameter, ConfigSpace.Constant):
