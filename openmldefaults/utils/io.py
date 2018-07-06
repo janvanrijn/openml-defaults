@@ -29,7 +29,9 @@ def cast_columns_of_dataframe(df, params, meta_data):
     for param in params:
         hyperparameter = config_space.get_hyperparameter(param)
 
-        if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter):
+        if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter) or \
+                (isinstance(hyperparameter, ConfigSpace.Constant) and isinstance(hyperparameter.value, int)) or \
+                (isinstance(hyperparameter, ConfigSpace.UnParametrizedHyperparameter) and isinstance(hyperparameter.value, int)):
             df[param] = df[param].astype(int)
     return df
 

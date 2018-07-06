@@ -25,13 +25,14 @@ def parse_args():
 def defaults_to_native_python(defaults):
     for idx, default in enumerate(defaults):
         for param, value in default.items():
-            if np.issubdtype(type(value), np.number):
-                if np.issubdtype(value, np.int):
-                    defaults[idx][param] = int(value)
-                elif np.issubdtype(type(value), np.float):
-                    defaults[idx][param] = float(value)
-                else:
-                    raise ValueError()
+            if isinstance(value, str):
+                defaults[idx][param] = json.loads(value)
+            elif np.issubdtype(type(value), np.int):
+                defaults[idx][param] = int(value)
+            elif isinstance(value, float):
+                defaults[idx][param] = float(value)
+            else:
+                raise ValueError()
     return defaults
 
 
