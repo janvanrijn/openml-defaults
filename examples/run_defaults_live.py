@@ -22,17 +22,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def defaults_to_native_python(defaults):
+def json_loads_defaults(defaults):
     for idx, default in enumerate(defaults):
         for param, value in default.items():
-            if isinstance(value, str):
-                defaults[idx][param] = json.loads(value)
-            elif np.issubdtype(type(value), np.int):
-                defaults[idx][param] = int(value)
-            elif isinstance(value, float):
-                defaults[idx][param] = float(value)
-            else:
-                raise ValueError()
+            defaults[idx][param] = openmldefaults.config_spaces.reinstantiate_parameter_value(value)
     return defaults
 
 
@@ -81,24 +74,26 @@ def run(args):
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
     param_grid = openmldefaults.search.config_space_to_dist(config_space)
 
-    output_dir = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', solver_dir, setup_dir, str(task_id))
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir_defaults = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', solver_dir, setup_dir, str(task_id))
+    os.makedirs(output_dir_defaults, exist_ok=True)
 
-    default_dir_specific = os.path.join(output_dir, 'default_search')
-    if not os.path.isdir(default_dir_specific):
-        generated_defaults = defaults_to_native_python(generated_defaults)
+    if not os.path.isdir(output_dir_defaults):
+        generated_defaults = json_loads_defaults(generated_defaults)
+        print(openmldefaults.utils.get_time(), 'Starting default search, defaults: %s' % generated_defaults)
         search = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
         run = openml.runs.run_model_on_task(search, task)
-        run.to_filesystem(default_dir_specific)
+        run.to_filesystem(output_dir_defaults)
 
     for i in range(1, 5):
-        output_dir_specific = os.path.join(output_dir, 'random_search_x%d' % i)
-        if os.path.isdir(output_dir_specific) and len(os.listdir(output_dir_specific)) > 0:
-            print('output dir already has content')
+        print(openmldefaults.utils.get_time(), 'Starting random search x%d, param grid: %s' % (i, param_grid))
+
+        output_dir_rs = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', 'random_search_x%d' % i, setup_dir, str(task_id))
+        if os.path.isdir(output_dir_rs) and len(os.listdir(output_dir_rs)) > 0:
+            print(openmldefaults.utils.get_time(), 'output dir already has content')
             continue
         search = sklearn.model_selection.RandomizedSearchCV(estimator, param_grid, args.num_defaults * i)
         run = openml.runs.run_model_on_task(search, task)
-        run.to_filesystem(output_dir_specific)
+        run.to_filesystem(output_dir_rs)
 
 
 if __name__ == '__main__':

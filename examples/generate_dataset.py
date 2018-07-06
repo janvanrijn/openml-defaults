@@ -60,6 +60,7 @@ def generate_configurations(config_space, current_index, max_values_per_paramete
         else:
             raise ValueError('Could not determine hyperparameter type: %s' % current_hyperparameter.name)
 
+        current_values = [openmldefaults.config_spaces.post_process(value) for value in current_values]
         result = []
         recursive_configs = generate_configurations(config_space, current_index+1, max_values_per_parameter)
         for recursive_config in recursive_configs:
@@ -123,14 +124,6 @@ def run(args):
 
     num_params = len(config_space.get_hyperparameter_names())
     configurations = generate_configurations(config_space, 0, args.resized_grid_size)
-    # post process configurations
-    for idx in range(len(configurations)):
-        for key, value in configurations[idx].items():
-            if value is "None":
-                # TODO: get this info from config space?!
-                value = None
-            if isinstance(value, str) or value is None:
-                configurations[idx][key] = json.dumps(value)
 
     df_orig = pd.DataFrame(configurations)
 

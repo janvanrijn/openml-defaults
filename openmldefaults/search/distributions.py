@@ -1,5 +1,6 @@
 import ConfigSpace
 import numpy as np
+import openmldefaults
 import scipy
 
 from scipy.stats._distn_infrastructure import rv_continuous, rv_discrete
@@ -78,7 +79,7 @@ def config_space_to_dist(ConfigurationSpace):
     result = dict()
     for hyperparameter in ConfigurationSpace.get_hyperparameters():
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter):
-            result[hyperparameter.name] = hyperparameter.choices
+            result[hyperparameter.name] = [openmldefaults.config_spaces.reinstantiate_parameter_value(openmldefaults.config_spaces.post_process(val)) for val in hyperparameter.choices]
         elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UniformFloatHyperparameter):
             if hyperparameter.log is True:
                 result[hyperparameter.name] = loguniform(2, hyperparameter.lower, hyperparameter.upper)
@@ -90,9 +91,9 @@ def config_space_to_dist(ConfigurationSpace):
             else:
                 result[hyperparameter.name] = scipy.stats.randint(hyperparameter.lower, hyperparameter.upper + 1)
         elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
-            result[hyperparameter.name] = [hyperparameter.value]
+            result[hyperparameter.name] = [openmldefaults.config_spaces.reinstantiate_parameter_value(openmldefaults.config_spaces.post_process(hyperparameter.value))]
         elif isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
-            result[hyperparameter.name] = [hyperparameter.value]
+            result[hyperparameter.name] = [openmldefaults.config_spaces.reinstantiate_parameter_value(openmldefaults.config_spaces.post_process(hyperparameter.value))]
         else:
             raise NotImplementedError()
     return result
