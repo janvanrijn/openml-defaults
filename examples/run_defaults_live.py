@@ -74,7 +74,9 @@ def run(args):
     categoricals = task.get_dataset().get_features_by_type('nominal', [task.target_name])
     categorical_params = {
         'hotencoding__categorical_features': categoricals,
-        'imputation__categorical_features': categoricals
+        'imputation__categorical_features': categoricals,
+        'imputation__fill_empty': -1,
+        'hotencoding__handle_unknown': 'ignore'
     }
     estimator.set_params(**categorical_params)
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
