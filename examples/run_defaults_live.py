@@ -59,18 +59,24 @@ def run(args):
     if correct_holdout_task_dir is None:
         raise ValueError('Could not find holdout task dir for task: %d' % args.task_idx)
     experiment_dir = os.path.join(configuration_dir, correct_holdout_task_dir)
-    experiment_file = os.path.join(experiment_dir, 'generated_defaults.pkl')
-    if not os.path.isfile(experiment_file):
-        raise ValueError('Defaults file not generated yet: %s' % experiment_file)
-    print(openmldefaults.utils.get_time(), 'Experiments file: %s' % experiment_file)
+    defaults_file = os.path.join(experiment_dir, 'generated_defaults.pkl')
+    if not os.path.isfile(defaults_file):
+        raise ValueError('Defaults file not generated yet: %s' % defaults_file)
+    print(openmldefaults.utils.get_time(), 'Experiments file: %s' % defaults_file)
 
-    with open(experiment_file, 'rb') as fp:
+    with open(defaults_file, 'rb') as fp:
         generated_defaults = pickle.load(fp)['defaults']
 
     flow = openml.flows.get_flow(meta_data['flow_id'])
     task_id = column_idx_task_id[args.task_idx]
     task = openml.tasks.get_task(task_id)
-    estimator = openml.flows.flow_to_sklearn(flow)
+    estimator = openml.flows.flow_to_sklearn(flow, initialize_with_defaults=True)
+    categoricals = task.get_dataset().get_features_by_type('nominal', [task.target_name])
+    categorical_params = {
+        'hotencoding__categorical_features': categoricals,
+        'imputation__categorical_features': categoricals
+    }
+    estimator.set_params(**categorical_params)
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
     param_grid = openmldefaults.search.config_space_to_dist(config_space)
 
@@ -94,6 +100,7 @@ def run(args):
         search = sklearn.model_selection.RandomizedSearchCV(estimator, param_grid, args.num_defaults * i)
         run = openml.runs.run_model_on_task(search, task)
         run.to_filesystem(output_dir_rs)
+        print(openmldefaults.utils.get_time(), 'Saved to: %s' % output_dir_rs)
 
 
 if __name__ == '__main__':
