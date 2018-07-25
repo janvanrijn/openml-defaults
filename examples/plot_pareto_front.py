@@ -1,5 +1,6 @@
 import argparse
 import collections
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import openmldefaults
@@ -19,6 +20,7 @@ def parse_args():
     parser.add_argument('--resized_grid_size', type=int, default=16)
     parser.add_argument('--num_defaults', type=int, default=3)
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
+    parser.add_argument('--condition_on', type=json.loads, default=None)
     return parser.parse_args()
 
 
@@ -28,17 +30,25 @@ def rand_jitter(arr):
 
 
 def plot_numeric(ax, name, x_series_dominated, y_series_dominated):
-    ax.scatter(rand_jitter(x_series_dominated.tolist()), rand_jitter(y_series_dominated.tolist()), label=name)
+    if len(x_series_dominated) > 0:
+        ax.scatter(rand_jitter(x_series_dominated.tolist()),
+                   rand_jitter(y_series_dominated.tolist()),
+                   label=name)
 
 
 def run(args):
     df_orig = openmldefaults.utils.load_dataset(args.dataset_path,
                                                 args.params,
                                                 args.resized_grid_size,
-                                                args.flip_performances)
-
+                                                args.flip_performances,
+                                                args.condition_on)
+    print(df_orig.shape)
     category_df = collections.OrderedDict()
     category_df['pareto'], category_df['dominated'] = openmldefaults.utils.simple_cull(df_orig, openmldefaults.utils.dominates_min)
+    json_serialized = ''
+    if args.condition_on is not None:
+        for param, value in args.condition_on.items():
+            json_serialized += '__' + param + '_' + str(value)
 
     plot_params = args.params[:args.num_params_plot]
     params_per_axis = len(plot_params)-1
@@ -91,7 +101,8 @@ def run(args):
     axes[0, 0].legend()
     plt.tight_layout()
     os.makedirs(args.output_dir, exist_ok=True)
-    plt.savefig(os.path.join(args.output_dir, 'params_%s.png' % dataset_name))
+    plt.savefig(os.path.join(args.output_dir, 'params_%s%s.png' % (dataset_name,
+                                                                   json_serialized)))
 
 
 if __name__ == '__main__':

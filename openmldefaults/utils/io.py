@@ -36,7 +36,7 @@ def cast_columns_of_dataframe(df, params, meta_data):
     return df
 
 
-def load_dataset(dataset_path, params, resized_grid_size, flip_performances):
+def load_dataset(dataset_path, params, resized_grid_size, flip_performances, condition_on=None):
     if dataset_path.endswith('.feather'):
         df = feather.read_dataframe(dataset_path)
     elif dataset_path.endswith('.arff'):
@@ -65,6 +65,11 @@ def load_dataset(dataset_path, params, resized_grid_size, flip_performances):
         df = openmldefaults.utils.reshape_configs(df, params, resized_grid_size)
 
     print_columns(df, params)
+
+    # remove values that are not according to the condition
+    if condition_on is not None:
+        for column, value in condition_on.items():
+            df = df.loc[df[column] == value]
 
     # always set the index
     df = df.set_index(params)
