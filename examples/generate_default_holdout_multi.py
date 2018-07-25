@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     datasets_to_run = datasets
     if args.dataset is not None:
-        datasets_to_run = {args.datasets: datasets[args.datasets]}
+        datasets_to_run = {args.dataset: datasets[args.dataset]}
 
     models = [openmldefaults.models.GreedyDefaults()]
     determine_pareto = False

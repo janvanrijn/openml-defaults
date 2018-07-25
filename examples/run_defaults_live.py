@@ -1,7 +1,7 @@
 import arff
 import argparse
+import collections
 import json
-import numpy as np
 import openml
 import openmldefaults
 import os
@@ -40,10 +40,9 @@ def run(args):
             if att_name.startswith(args.dataset_prefix):
                 column_idx_task_id.append(int(att_name[len(args.dataset_prefix):]))
 
-    solver_dir = args.model_name
     dataset_dir = os.path.basename(args.dataset_path)
     setup_dir = openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults)
-    configuration_dir = os.path.join(args.defaults_dir, dataset_dir, 'generated_defaults', solver_dir, setup_dir)
+    configuration_dir = os.path.join(args.defaults_dir, dataset_dir, 'generated_defaults', args.model_name, setup_dir)
     if not os.path.isdir(configuration_dir):
         raise ValueError('Directory does not exists: %s' % configuration_dir)
     correct_holdout_task_dir = None
@@ -82,27 +81,24 @@ def run(args):
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
     param_grid = openmldefaults.search.config_space_to_dist(config_space)
 
-    output_dir_defaults = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', solver_dir, setup_dir, str(task_id))
-    os.makedirs(output_dir_defaults, exist_ok=True)
-
-    if not os.path.isdir(output_dir_defaults):
-        generated_defaults = json_loads_defaults(generated_defaults)
-        print(openmldefaults.utils.get_time(), 'Starting default search, defaults: %s' % generated_defaults)
-        search = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
-        run = openml.runs.run_model_on_task(search, task)
-        run.to_filesystem(output_dir_defaults)
-
+    scheduled_strategies = collections.OrderedDict()
+    generated_defaults = json_loads_defaults(generated_defaults)
+    scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
     for i in range(1, 5):
-        print(openmldefaults.utils.get_time(), 'Starting random search x%d, param grid: %s' % (i, param_grid))
+        scheduled_strategies['random_search_x%d' % i] = sklearn.model_selection.RandomizedSearchCV(estimator,
+                                                                                                   param_grid,
+                                                                                                   args.num_defaults * i)
 
-        output_dir_rs = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', 'random_search_x%d' % i, setup_dir, str(task_id))
-        if os.path.isdir(output_dir_rs) and len(os.listdir(output_dir_rs)) > 0:
-            print(openmldefaults.utils.get_time(), 'output dir already has content')
-            continue
-        search = sklearn.model_selection.RandomizedSearchCV(estimator, param_grid, args.num_defaults * i)
-        run = openml.runs.run_model_on_task(search, task)
-        run.to_filesystem(output_dir_rs)
-        print(openmldefaults.utils.get_time(), 'Saved to: %s' % output_dir_rs)
+    for strategy, search_estimator in scheduled_strategies.items():
+        output_dir_strategy = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', strategy,
+                                           setup_dir, str(task_id))
+        os.makedirs(output_dir_strategy, exist_ok=True)
+        if not os.path.isdir(output_dir_strategy) and len(os.listdir(output_dir_strategy)) > 0:
+            run = openml.runs.run_model_on_task(search_estimator, task)
+            run.to_filesystem(output_dir_strategy, store_model=False)
+            print(openmldefaults.utils.get_time(), 'Saved to: %s' % output_dir_strategy)
+        else:
+            print(openmldefaults.utils.get_time(), 'Results already exist: %s in %s' % (strategy, output_dir_strategy))
 
 
 if __name__ == '__main__':
