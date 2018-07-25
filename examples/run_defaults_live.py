@@ -93,7 +93,8 @@ def run(args):
         output_dir_strategy = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', strategy,
                                            setup_dir, str(task_id))
         os.makedirs(output_dir_strategy, exist_ok=True)
-        if not os.path.isdir(output_dir_strategy) and len(os.listdir(output_dir_strategy)) > 0:
+        if len(os.listdir(output_dir_strategy)) < 3:
+            # we expect at least a trace.arff, predictions.arff and description.arff
             run = openml.runs.run_model_on_task(search_estimator, task)
             run.to_filesystem(output_dir_strategy, store_model=False)
             print(openmldefaults.utils.get_time(), 'Saved to: %s' % output_dir_strategy)
