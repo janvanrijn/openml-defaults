@@ -2,6 +2,7 @@ import argparse
 import collections
 import matplotlib.pyplot as plt
 import openml
+import openmldefaults
 import os
 import sklearn
 
@@ -22,8 +23,8 @@ def parse_args():
 
 
 def plot(defaults_strategy_scores, output_dir, dataset_name):
-    fig = plt.figure()
     n_figs = len(defaults_strategy_scores)
+    fig = plt.figure(figsize=(8, 3*n_figs))
     axes = [fig.add_subplot(1, n_figs, i) for i in range(1, n_figs + 1)]
     for i, (num_defaults, strategy_scores) in enumerate(defaults_strategy_scores.items()):
         axes[i].boxplot([scores for scores in strategy_scores.values()])
@@ -65,11 +66,13 @@ def run():
                         results[num_defaults] = collections.OrderedDict()
                     if strategy not in results[num_defaults]:
                         results[num_defaults][strategy] = list()
-                    print('Loaded', result_dir)
                     results[num_defaults][strategy].append(accuracy_avg)
                 except ValueError:
                     # experiment not terminated yet
                     pass
+            print(openmldefaults.utils.get_time(),
+                  'Strategy %s %d defaults, loaded %d tasks' % (strategy, num_defaults,
+                                                                len(results[num_defaults][strategy])))
     plot(results, args.output_dir, args.dataset_name)
 
 
