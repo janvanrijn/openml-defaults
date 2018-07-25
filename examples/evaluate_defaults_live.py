@@ -24,7 +24,7 @@ def parse_args():
 
 def plot(defaults_strategy_scores, output_dir, dataset_name):
     n_figs = len(defaults_strategy_scores)
-    fig = plt.figure(figsize=(8, 3*n_figs))
+    fig = plt.figure(figsize=(4*n_figs, 6))
     axes = [fig.add_subplot(1, n_figs, i) for i in range(1, n_figs + 1)]
     for i, (num_defaults, strategy_scores) in enumerate(defaults_strategy_scores.items()):
         axes[i].boxplot([scores for scores in strategy_scores.values()])
