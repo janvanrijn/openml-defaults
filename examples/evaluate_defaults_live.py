@@ -16,7 +16,7 @@ def parse_args():
                                 'surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--flip_performances', action='store_true', default=True)
     parser.add_argument('--resized_grid_size', type=int, default=8)
-    parser.add_argument('--max_num_defaults', type=int, default=2)
+    parser.add_argument('--max_num_defaults', type=int, default=None)
     parser.add_argument('--cv_iterations', type=int, default=10)
     parser.add_argument('--normalize', action="store_true")
     parser.add_argument('--input_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
@@ -34,7 +34,7 @@ def openml_sklearn_metric_mapping(openml_metric):
     return mapping[openml_metric]
 
 
-def plot(defaults_strategy_task_score, ylabel, output_file):
+def plot(defaults_strategy_task_score, y_label, output_file):
     n_figs = len(defaults_strategy_task_score)
     fig = plt.figure(figsize=(4*n_figs, 6))
     axes = [fig.add_subplot(1, n_figs, i) for i in range(1, n_figs + 1)]
@@ -43,7 +43,7 @@ def plot(defaults_strategy_task_score, ylabel, output_file):
         axes[i].boxplot([list(task_score.values()) for task_score in strategy_task_score.values()])
         axes[i].set_xticklabels([strategy for strategy in strategy_task_score.keys()], rotation=45, ha='right')
         axes[i].set_title(str(num_defaults) + ' defaults')
-    axes[0].set_ylabel(ylabel)
+    axes[0].set_ylabel(y_label)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()

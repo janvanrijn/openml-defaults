@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument('--dataset_prefix', type=str, default='predictive_accuracy_task_')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--num_defaults', type=int, default=1)
+    parser.add_argument('--random_state', type=int, default=42)
     parser.add_argument('--model_name', type=str, default='greedy')
     parser.add_argument('--defaults_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
@@ -82,9 +83,11 @@ def run(args):
     generated_defaults = json_loads_defaults(generated_defaults)
     scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
     for i in range(1, 5):
-        scheduled_strategies['random_search_x%d' % i] = sklearn.model_selection.RandomizedSearchCV(estimator,
-                                                                                                   param_grid,
-                                                                                                   args.num_defaults * i)
+        search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator,
+                                                                     param_grid,
+                                                                     args.num_defaults * i,
+                                                                     random_state=args.random_state)
+        scheduled_strategies['random_search_x%d' % i] = search_strategy
 
     for strategy, search_estimator in scheduled_strategies.items():
         output_dir_strategy = os.path.join(args.defaults_dir, dataset_dir, 'live_random_search', strategy,
