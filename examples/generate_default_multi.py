@@ -3,7 +3,6 @@ import openmldefaults
 import os
 
 from examples.generate_defaults import run as generate_defaults
-from examples.evaluate_defaults import run as evaluate_defaults
 
 
 def parse_args():
