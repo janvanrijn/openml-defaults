@@ -30,11 +30,8 @@ def json_loads_defaults(defaults):
 
 
 def run(args):
+    meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
     with open(args.dataset_path) as fp:
-        first_line = fp.readline()
-        if first_line[0] != '%':
-            raise ValueError('arff data file should start with comment for meta-data')
-        meta_data = json.loads(first_line[1:])
         column_idx_task_id = []
         for att_name, att_type in arff.load(fp)['attributes']:
             if att_name.startswith(args.dataset_prefix):

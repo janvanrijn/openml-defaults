@@ -36,6 +36,15 @@ def cast_columns_of_dataframe(df, params, meta_data):
     return df
 
 
+def get_dataset_metadata(dataset_path):
+    with open(dataset_path) as fp:
+        first_line = fp.readline()
+        if first_line[0] != '%':
+            raise ValueError('arff data file should start with comment for meta-data')
+        meta_data = json.loads(first_line[1:])
+    return meta_data
+
+
 def load_dataset(dataset_path, params, resized_grid_size, flip_performances, condition_on=None):
     if dataset_path.endswith('.feather'):
         df = feather.read_dataframe(dataset_path)

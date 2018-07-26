@@ -99,7 +99,8 @@ def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, c
     # TODO: HPO
     surrogate = sklearn.pipeline.Pipeline(steps=[
         ('imputer', sklearn.preprocessing.Imputer(strategy='median')),
-        ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64, random_state=42))
+        ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64,
+                                                              random_state=42))
     ])
     surrogate.fit(pd.get_dummies(setup_data).as_matrix(), y)
     return surrogate, setup_data.columns.values
@@ -117,10 +118,14 @@ def run(args):
     else:
         raise ValueError('classifier type not recognized')
     config_space_fn = getattr(openmldefaults.config_spaces,
-                           'get_%s_%s_search_space' % (args.classifier, args.config_space))
+                              'get_%s_%s_search_space' % (args.classifier,
+                                                          args.config_space))
     config_space = config_space_fn(False)
     config_space_mapping = openmldefaults.config_spaces.prefix_mapping(config_space_fn)
-    meta_data = {'flow_id': flow_id, 'classifier': args.classifier, 'config_space': args.config_space}
+    meta_data = {'flow_id': flow_id,
+                 'classifier': args.classifier,
+                 'config_space': args.config_space,
+                 'scoring': args.scoring}
 
     num_params = len(config_space.get_hyperparameter_names())
     configurations = generate_configurations(config_space, 0, args.resized_grid_size)
@@ -151,12 +156,15 @@ def run(args):
         raise ValueError('surrogate frame has too few columns. Min: %d Got %d' % (num_params + len(study.tasks) / 2,
                                                                                   df_surrogate.shape[1]))
     os.makedirs(args.output_directory, exist_ok=True)
-    arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate, 'surrogate_%s' % args.classifier, json.dumps(meta_data))
+    arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate,
+                                                       'surrogate_%s' % args.classifier,
+                                                       json.dumps(meta_data))
     arff_object['attributes'] = [(config_space_mapping[att_name] if att_name in config_space_mapping else att_name, att_type)
                                  for att_name, att_type in arff_object['attributes']]
 
-    with open(os.path.join(args.output_directory, 'surrogate_%s_c%d.arff' % (args.classifier,
-                                                                             args.resized_grid_size)), 'w') as fp:
+    with open(os.path.join(args.output_directory, 'surrogate__%s__%s__c%d.arff' % (args.classifier,
+                                                                                   args.scoring,
+                                                                                   args.resized_grid_size)), 'w') as fp:
         arff.dump(arff_object, fp)
 
 
