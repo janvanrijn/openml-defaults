@@ -11,10 +11,9 @@ import sklearn
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c8.arff')
+    parser.add_argument('--dataset_path', type=str, default=os.path.expanduser('~') +
+                        '/data/openml-defaults/surrogate__adaboost__f_measure__c8.arff')
     parser.add_argument('--task_idx', type=int, default=0)
-    parser.add_argument('--dataset_prefix', type=str, default='predictive_accuracy_task_')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--num_defaults', type=int, default=1)
     parser.add_argument('--random_state', type=int, default=42)
@@ -35,8 +34,9 @@ def run(args):
     with open(args.dataset_path) as fp:
         column_idx_task_id = []
         for att_name, att_type in arff.load(fp)['attributes']:
-            if att_name.startswith(args.dataset_prefix):
-                column_idx_task_id.append(int(att_name[len(args.dataset_prefix):]))
+            surrogate_column_prefix = meta_data['scoring'] + '_task_'
+            if att_name.startswith(surrogate_column_prefix):
+                column_idx_task_id.append(int(att_name[len(surrogate_column_prefix):]))
 
     dataset_dir = os.path.basename(args.dataset_path)
     setup_dir = openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults)

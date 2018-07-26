@@ -9,6 +9,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--dataset', type=str, default=None)
+    parser.add_argument('--scoring', type=str, default=None)
     parser.add_argument('--max_num_defaults', type=int, default=10)
     parser.add_argument('--c_executable', type=str, default='../c/main')
     parser.add_argument('--cv_iterations', type=int, default=10)
@@ -23,14 +24,27 @@ if __name__ == '__main__':
     args = parse_args()
 
     datasets = {
-        'adaboost':
+        ('adaboost', 'predictive_accuracy'):
             (os.path.expanduser('~') + '/data/openml-defaults/surrogate__adaboost__predictive_accuracy__c8.arff',
              100,
              True,
              ['classifier__algorithm', 'classifier__learning_rate', 'classifier__base_estimator__max_depth',
               'classifier__n_estimators', 'imputation__strategy']),
-        'random_forest':
+        ('random_forest', 'predictive_accuracy'):
             (os.path.expanduser('~') + '/data/openml-defaults/surrogate__random_forest__predictive_accuracy__c8.arff',
+             94,
+             True,
+             ['classifier__bootstrap', 'classifier__criterion', 'classifier__max_depth', 'classifier__max_features',
+              'classifier__max_leaf_nodes', 'classifier__min_samples_leaf', 'classifier__min_samples_split',
+              'classifier__min_weight_fraction_leaf', 'classifier__n_estimators', 'imputation__strategy']),
+        ('adaboost', 'f_measure'):
+            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__adaboost__f_measure__c8.arff',
+             100,
+             True,
+             ['classifier__algorithm', 'classifier__learning_rate', 'classifier__base_estimator__max_depth',
+              'classifier__n_estimators', 'imputation__strategy']),
+        ('random_forest', 'f_measure'):
+            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__random_forest__f_measure__c8.arff',
              94,
              True,
              ['classifier__bootstrap', 'classifier__criterion', 'classifier__max_depth', 'classifier__max_features',
@@ -44,8 +58,15 @@ if __name__ == '__main__':
     }
 
     datasets_to_run = datasets
-    if args.dataset is not None:
-        datasets_to_run = {args.dataset: datasets[args.dataset]}
+    if args.dataset is not None and args.scoring is not None:
+        key = (args.dataset, args.scoring)
+        datasets_to_run = {key: datasets[key]}
+    elif args.dataset is not None:
+        key = args.dataset
+        datasets_to_run = {key: datasets[key]}
+        # TODO: won't work when just dataset is given
+    elif args.scoring is not None:
+        raise ValueError('Not supported')
 
     models = [openmldefaults.models.GreedyDefaults()]
     determine_pareto = False
