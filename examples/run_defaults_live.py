@@ -83,9 +83,11 @@ def run(args):
     generated_defaults = json_loads_defaults(generated_defaults)
     scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
     for i in range(1, 5):
+        rs_scoring = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
         search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator,
                                                                      param_grid,
                                                                      args.num_defaults * i,
+                                                                     scoring=rs_scoring,
                                                                      random_state=args.random_state,
                                                                      n_jobs=-1)
         scheduled_strategies['random_search_x%d' % i] = search_strategy

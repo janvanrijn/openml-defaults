@@ -22,11 +22,11 @@ if __name__ == '__main__':
     args = parse_args()
 
     datasets = [
-        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_adaboost_c8.arff',
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate__adaboost__predictive_accuracy__c8.arff',
          None,
          True,
          ['algorithm', 'learning_rate', 'classifier__max_depth', 'n_estimators', 'imputation__strategy']),
-        (os.path.expanduser('~') + '/data/openml-defaults/surrogate_random_forest_c8.arff',
+        (os.path.expanduser('~') + '/data/openml-defaults/surrogate__random_forest__predictive_accuracy__c8.arff',
          None,
          True,
          ['bootstrap', 'criterion', 'max_depth', 'max_features', 'max_leaf_nodes', 'min_samples_leaf',

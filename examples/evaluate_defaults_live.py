@@ -18,20 +18,10 @@ def parse_args():
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--max_num_defaults', type=int, default=None)
     parser.add_argument('--cv_iterations', type=int, default=10)
-    parser.add_argument('--normalize', action="store_true")
     parser.add_argument('--input_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
     parser.add_argument('--vs_strategy', type=str, default='greedy')
     return parser.parse_args()
-
-
-def openml_sklearn_metric_mapping(openml_metric):
-    mapping = {
-        'predictive_accuracy': sklearn.metrics.accuracy_score
-    }
-    if openml_metric not in mapping:
-        raise ValueError('Could not find sklearn metric for openml measure: %s' %openml_metric)
-    return mapping[openml_metric]
 
 
 def plot(defaults_strategy_task_score, y_label, output_file):
@@ -92,7 +82,7 @@ def run():
                 result_dir = os.path.join(strategies_dir, strategy, setup, task_id)
                 try:
                     run = openml.runs.OpenMLRun.from_filesystem(result_dir, expect_model=False)
-                    sklearn_metric = openml_sklearn_metric_mapping(meta_data['scoring'])
+                    sklearn_metric = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
                     evaluation_scores = run.get_metric_fn(sklearn_metric)
                     accuracy_avg = sum(evaluation_scores) / len(evaluation_scores)
                     if task_id not in task_minscores or accuracy_avg < task_minscores[task_id]:
@@ -119,12 +109,12 @@ def run():
             print(openmldefaults.utils.get_time(),
                   'Strategy %s %d defaults, loaded %d tasks' % (strategy, num_defaults,
                                                                 len(results[num_defaults][strategy])))
-    if args.normalize:
-        results = normalize_scores(results, task_minscores, task_maxscores)
 
-    filename = "%s_live%s.png" % (dataset_name, '_normalized' if args.normalize is True else '')
-    output_file = os.path.join(args.output_dir, filename)
-    plot(results, meta_data['scoring'], output_file)
+    results_normalized = normalize_scores(results, task_minscores, task_maxscores)
+    outputfile_normalized = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
+    outputfile_vanilla = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
+    plot(results, meta_data['scoring'], outputfile_vanilla)
+    plot(results_normalized, meta_data['scoring'], outputfile_normalized)
 
 
 if __name__ == '__main__':
