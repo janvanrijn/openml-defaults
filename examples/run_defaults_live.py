@@ -86,7 +86,8 @@ def run(args):
         search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator,
                                                                      param_grid,
                                                                      args.num_defaults * i,
-                                                                     random_state=args.random_state)
+                                                                     random_state=args.random_state,
+                                                                     n_jobs=-1)
         scheduled_strategies['random_search_x%d' % i] = search_strategy
 
     for strategy, search_estimator in scheduled_strategies.items():

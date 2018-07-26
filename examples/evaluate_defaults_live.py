@@ -99,6 +99,14 @@ def run():
                         task_minscores[task_id] = accuracy_avg
                     if task_id not in task_maxscores or accuracy_avg > task_maxscores[task_id]:
                         task_maxscores[task_id] = accuracy_avg
+                    random_search_prefix = 'random_search_x'
+                    expected_cv_iterations = 10
+                    if random_search_prefix in strategy:
+                        rs_multiplier = int(strategy[len(random_search_prefix):])
+                        expected_traces = rs_multiplier * num_defaults * expected_cv_iterations
+                    else:
+                        expected_traces = num_defaults * expected_cv_iterations
+                    assert len(run.trace_content) == expected_traces
 
                     if num_defaults not in results:
                         results[num_defaults] = collections.OrderedDict()
