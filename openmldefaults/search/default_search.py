@@ -5,11 +5,10 @@ class DefaultSearchCV(BaseSearchCV):
 
     def __init__(self, estimator, defaults, scoring=None,
                  fit_params=None, n_jobs=1, iid='warn', refit=True, cv=None,
-                 verbose=0, pre_dispatch='2*n_jobs', random_state=None,
+                 verbose=0, pre_dispatch='2*n_jobs',
                  error_score='raise', return_train_score="warn"):
         DefaultSearchCV._verify_defaults(defaults)
         self.defaults = defaults
-        self.random_state = random_state
         self.param_distributions = DefaultSearchCV._determine_param_distributions(defaults)
         super(DefaultSearchCV, self).__init__(
             estimator=estimator, scoring=scoring, fit_params=fit_params,

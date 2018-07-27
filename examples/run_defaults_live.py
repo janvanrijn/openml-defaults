@@ -12,7 +12,7 @@ import sklearn
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str, default=os.path.expanduser('~') +
-                        '/data/openml-defaults/surrogate__adaboost__f_measure__c8.arff')
+                        '/data/openml-defaults/surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--num_defaults', type=int, default=1)
@@ -81,13 +81,18 @@ def run(args):
 
     scheduled_strategies = collections.OrderedDict()
     generated_defaults = json_loads_defaults(generated_defaults)
-    scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults)
+
+    search_scorer = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
+    if meta_data['scoring'] != 'predictive_accuracy':
+        raise ValueError('Due to a bug only accuracy is supported')
+
+    scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults,
+                                                                                  scoring=search_scorer, n_jobs=-1)
     for i in range(1, 5):
-        rs_scoring = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
         search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator,
                                                                      param_grid,
                                                                      args.num_defaults * i,
-                                                                     scoring=rs_scoring,
+                                                                     scoring=search_scorer,
                                                                      random_state=args.random_state,
                                                                      n_jobs=-1)
         scheduled_strategies['random_search_x%d' % i] = search_strategy
