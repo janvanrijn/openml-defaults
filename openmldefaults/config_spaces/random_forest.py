@@ -14,7 +14,8 @@ def get_random_forest_default_search_space(show_prefix=True):
     # m is the total number of features, and max_features is the hyperparameter specified below.
     # The default is 0.5, which yields sqrt(m) features as max_features in the estimator. This
     # corresponds with Geurts' heuristic.
-    max_features = ConfigSpace.UniformFloatHyperparameter(prefix('classifier', show_prefix) + "max_features", 0., 1., default_value=0.5)
+    # XXX: Can't use 0 as minimal value, as sklearn forbids this value
+    max_features = ConfigSpace.UniformFloatHyperparameter(prefix('classifier', show_prefix) + "max_features", 0.001, 1., default_value=0.5)
 
     max_depth = ConfigSpace.UnParametrizedHyperparameter(prefix('classifier', show_prefix) + "max_depth", "None")
     min_samples_split = ConfigSpace.UniformIntegerHyperparameter(prefix('classifier', show_prefix) + "min_samples_split", 2, 20, default_value=2)

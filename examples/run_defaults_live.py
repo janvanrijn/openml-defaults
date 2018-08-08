@@ -104,7 +104,8 @@ def run(args):
         os.makedirs(output_dir_strategy, exist_ok=True)
         if len(os.listdir(output_dir_strategy)) < 3:
             # we expect at least a trace.arff, predictions.arff and description.arff
-            run = openml.runs.run_model_on_task(search_estimator, task)
+            # XXX: avoid_duplicate_runs since we don't intent to upload to OpenML (and fields are to big for XSD)
+            run = openml.runs.run_model_on_task(search_estimator, task, avoid_duplicate_runs=False)
             run.to_filesystem(output_dir_strategy, store_model=False)
             print(openmldefaults.utils.get_time(), 'Saved to: %s' % output_dir_strategy)
         else:
