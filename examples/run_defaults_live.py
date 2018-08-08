@@ -30,6 +30,7 @@ def json_loads_defaults(defaults):
 
 
 def run(args):
+    print(openmldefaults.utils.get_time(), args)
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
     with open(args.dataset_path) as fp:
         column_idx_task_id = []
