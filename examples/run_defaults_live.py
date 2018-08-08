@@ -84,8 +84,6 @@ def run(args):
     generated_defaults = json_loads_defaults(generated_defaults)
 
     search_scorer = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
-    if meta_data['scoring'] != 'predictive_accuracy':
-        raise ValueError('Due to a bug only accuracy is supported')
 
     scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults,
                                                                                   scoring=search_scorer, n_jobs=-1)
