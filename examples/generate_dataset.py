@@ -27,11 +27,38 @@ def parse_args():
     return parser.parse_args()
 
 
-def generate_configurations(config_space, current_index, max_values_per_parameter):
-    if current_index >= len(config_space.get_hyperparameters()):
+def determine_parameter_order(config_space, ignore_params):
+    order = []
+
+    def iterate_params(params):
+        for param in params:
+            children = config_space.get_children_of(param)
+            if ignore_params is not None and param in ignore_params and len(children) > 0:
+                raise ValueError('Param %s is ignored but has %d child params' % (param.name, len(children)))
+            if ignore_params is None or param.name not in ignore_params:
+                order.append(param.name)
+                iterate_params(children)
+        pass
+
+    unconditionals = [config_space.get_hyperparameter(name) for name in config_space.get_all_unconditional_hyperparameters()]
+    iterate_params(unconditionals)
+    return order
+
+
+def generate_configurations(config_space, param_order, current_index, max_values_per_parameter, ignore_parameters):
+    def copy_recursive_configs(recursive_config_, current_name_, current_values_):
+        result_ = []
+        for i_ in range(len(current_values_)):
+            current_value = current_values_[i_]
+            cp = dict(recursive_config_)
+            cp[current_name_] = current_value
+            result_.append(cp)
+        return result_
+
+    if current_index >= len(param_order):
         return [{}]
     else:
-        current_hyperparameter = config_space.get_hyperparameter(config_space.get_hyperparameter_by_idx(current_index))
+        current_hyperparameter = config_space.get_hyperparameter(param_order[len(param_order) - 1 - current_index])
         if isinstance(current_hyperparameter, ConfigSpace.CategoricalHyperparameter):
             current_values = current_hyperparameter.choices
         elif isinstance(current_hyperparameter, ConfigSpace.UniformFloatHyperparameter):
@@ -60,19 +87,34 @@ def generate_configurations(config_space, current_index, max_values_per_paramete
         else:
             raise ValueError('Could not determine hyperparameter type: %s' % current_hyperparameter.name)
 
+        recursive_configs = generate_configurations(config_space, param_order, current_index+1,
+                                                    max_values_per_parameter,
+                                                    ignore_parameters)
+        if ignore_parameters is not None and current_hyperparameter.name in ignore_parameters:
+            return recursive_configs
         current_values = [openmldefaults.config_spaces.post_process(value) for value in current_values]
         result = []
-        recursive_configs = generate_configurations(config_space, current_index+1, max_values_per_parameter)
+
         for recursive_config in recursive_configs:
-            for i in range(len(current_values)):
-                current_value = current_values[i]
-                cp = dict(recursive_config)
-                cp[current_hyperparameter.name] = current_value
-                result.append(cp)
+            parent_conditions = config_space.get_parent_conditions_of(current_hyperparameter.name)
+            if len(parent_conditions) == 0:
+                result.extend(copy_recursive_configs(recursive_config, current_hyperparameter.name, current_values))
+            elif len(parent_conditions) == 1:
+                condition_values = parent_conditions[0].value if isinstance(parent_conditions[0].value, list) \
+                    else [parent_conditions[0].value]
+                condition_values_processed = [openmldefaults.config_spaces.post_process(value)
+                                              for value in condition_values]
+                if recursive_config[parent_conditions[0].parent.name] in condition_values_processed:
+                    result.extend(copy_recursive_configs(recursive_config, current_hyperparameter.name, current_values))
+                else:
+                    result.extend(copy_recursive_configs(recursive_config, current_hyperparameter.name, [np.nan]))
+            else:
+                raise NotImplementedError('Hyperparameter %s has multiple parent conditions' %
+                                          current_hyperparameter.name)
         return result
 
 
-def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, cache_directory):
+def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, ignore_parameters, scoring, cache_directory):
     nominal_values_min = 10
     # obtain the data
     setup_data = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
@@ -82,9 +124,14 @@ def train_surrogate_on_task(task_id, flow_id, num_runs, config_space, scoring, c
                                                                        parameter_field='parameter_name',
                                                                        evaluation_measure=scoring,
                                                                        cache_directory=cache_directory)
+    if ignore_parameters is not None:
+        for ignore_parameter in ignore_parameters:
+            del setup_data[ignore_parameter]
 
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
+        if ignore_parameters is not None and hyperparameter in ignore_parameters:
+            continue
         if isinstance(hyperparameter, ConfigSpace.CategoricalHyperparameter):
             for value in hyperparameter.choices:
                 num_occurances = len(setup_data.loc[setup_data[hyperparameter.name] == value])
@@ -111,10 +158,13 @@ def run(args):
 
     if args.classifier == 'random_forest':
         flow_id = 6969
+        ignore_parameters = None
     elif args.classifier == 'adaboost':
         flow_id = 6970
+        ignore_parameters = None
     elif args.classifier == 'libsvm_svc':
         flow_id = 7707
+        ignore_parameters = ['max_iter', 'tol', 'strategy', 'shrinking']
     else:
         raise ValueError('classifier type not recognized')
     config_space_fn = getattr(openmldefaults.config_spaces,
@@ -128,20 +178,22 @@ def run(args):
                  'scoring': args.scoring}
 
     num_params = len(config_space.get_hyperparameter_names())
-    configurations = generate_configurations(config_space, 0, args.resized_grid_size)
+    param_order = determine_parameter_order(config_space, ignore_parameters)
+    configurations = generate_configurations(config_space, param_order, 0, args.resized_grid_size, ignore_parameters)
 
     df_orig = pd.DataFrame(configurations)
+    print(openmldefaults.utils.get_time(), 'Meta-dataset dimensions: %s' % str(df_orig.shape))
 
     df_surrogate = df_orig.copy()
     for task_id in study.tasks:
         try:
-            estimator, columns = train_surrogate_on_task(task_id, flow_id, args.num_runs,
-                                                         config_space, args.scoring, args.cache_directory)
+            estimator, columns = train_surrogate_on_task(task_id, flow_id, args.num_runs, config_space,
+                                                         ignore_parameters, args.scoring, args.cache_directory)
         except ValueError as e:
             print('Error at task %d: %s' % (task_id, e))
             continue
         if not np.array_equal(df_orig.columns.values, columns):
-            raise ValueError()
+            raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
         surrogate_values = estimator.predict(pd.get_dummies(df_orig).as_matrix())
         df_surrogate['%s_task_%d' % (args.scoring, task_id)] = surrogate_values
 
