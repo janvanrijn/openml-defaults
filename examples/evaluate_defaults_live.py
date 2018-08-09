@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import openml
 import openmldefaults
 import os
-import sklearn
+import warnings
 
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
@@ -82,8 +82,8 @@ def run():
                 result_dir = os.path.join(strategies_dir, strategy, setup, task_id)
                 try:
                     run = openml.runs.OpenMLRun.from_filesystem(result_dir, expect_model=False)
-                    sklearn_metric = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
-                    evaluation_scores = run.get_metric_fn(sklearn_metric)
+                    sklearn_metric, kwargs = openmldefaults.utils.openml_sklearn_metric_fn_mapping(meta_data['scoring'])
+                    evaluation_scores = run.get_metric_fn(sklearn_metric, kwargs)
                     accuracy_avg = sum(evaluation_scores) / len(evaluation_scores)
                     if task_id not in task_minscores or accuracy_avg < task_minscores[task_id]:
                         task_minscores[task_id] = accuracy_avg
@@ -106,9 +106,12 @@ def run():
                 except ValueError:
                     # experiment not terminated yet
                     pass
-            print(openmldefaults.utils.get_time(),
-                  'Strategy %s %d defaults, loaded %d tasks' % (strategy, num_defaults,
-                                                                len(results[num_defaults][strategy])))
+            if num_defaults in results:
+                print(openmldefaults.utils.get_time(),
+                      'Strategy %s %d defaults, loaded %d tasks' % (strategy, num_defaults,
+                                                                    len(results[num_defaults][strategy])))
+            else:
+                warnings.warn('Strategy %s %d defaults does not have any results yet' % (strategy, num_defaults))
 
     results_normalized = normalize_scores(results, task_minscores, task_maxscores)
     outputfile_normalized = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
