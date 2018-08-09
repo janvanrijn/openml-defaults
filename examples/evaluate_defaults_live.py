@@ -111,10 +111,11 @@ def run():
                       'Strategy %s %d defaults, loaded %d tasks' % (strategy, num_defaults,
                                                                     len(results[num_defaults][strategy])))
             else:
-                warnings.warn('Strategy %s %d defaults does not have any results yet' % (strategy, num_defaults))
+                warnings.warn('%s Strategy %s %d defaults does not have any results yet' %
+                              (openmldefaults.utils.get_time(), strategy, num_defaults))
 
     results_normalized = normalize_scores(results, task_minscores, task_maxscores)
-    outputfile_normalized = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
+    outputfile_normalized = os.path.join(args.output_dir, "%s_live__normalized.png" % dataset_name)
     outputfile_vanilla = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
     plot(results, meta_data['scoring'], outputfile_vanilla)
     plot(results_normalized, meta_data['scoring'], outputfile_normalized)
