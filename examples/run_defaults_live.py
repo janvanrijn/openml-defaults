@@ -70,13 +70,18 @@ def run(args):
     task = openml.tasks.get_task(task_id)
     estimator = openml.flows.flow_to_sklearn(flow, initialize_with_defaults=True)
     categoricals = task.get_dataset().get_features_by_type('nominal', [task.target_name])
-    categorical_params = {
+    additional_params = {
         'hotencoding__categorical_features': categoricals,
         'imputation__categorical_features': categoricals,
         'imputation__fill_empty': -1,
         'hotencoding__handle_unknown': 'ignore'
     }
-    estimator.set_params(**categorical_params)
+    for param in estimator.get_params():
+        if param.endswith('random_state'):
+            additional_params[param] = args.random_state
+
+    estimator.set_params(**additional_params)
+
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
     param_grid = openmldefaults.search.config_space_to_dist(config_space)
 
