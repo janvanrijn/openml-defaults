@@ -9,7 +9,6 @@ class GreedyDefaults(object):
 
     def generate_defaults(self, df, num_defaults):
         print(openmldefaults.utils.get_time(), 'Started %s' % self.name)
-
         start_time = time.time()
 
         selected_configs = []
@@ -19,7 +18,7 @@ class GreedyDefaults(object):
             best_score = None
             best_index = None
             for idx, current_config in enumerate(df.index.values):
-                current_score = sum(openmldefaults.utils.selected_set(df, selected_configs + [current_config]))
+                current_score = sum(openmldefaults.utils.selected_set_index(df, selected_indices + [idx]))
                 if best_score is None or current_score < best_score:
                     best_score = current_score
                     best_addition = current_config
@@ -33,7 +32,7 @@ class GreedyDefaults(object):
         runtime = time.time() - start_time
         results_dict = {
             'defaults': selected_defaults,
-            'indices': selected_configs,
+            'indices': selected_indices,
             'objective': best_score,
             'run_time': runtime,
         }

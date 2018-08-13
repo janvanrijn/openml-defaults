@@ -1,5 +1,11 @@
 import json
 import numpy as np
+import openmldefaults
+
+
+def get_search_space(search_space, type):
+    name = 'get_' + search_space + '_' + type + '_search_space'
+    return getattr(openmldefaults.config_spaces, name)()
 
 
 def post_process(value):

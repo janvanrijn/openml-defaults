@@ -11,7 +11,10 @@ def selected_set(df: pd.DataFrame, defaults: List[Tuple], column_slice: List=Non
         df = df.iloc[:, column_slice]
     # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
     # then we take the median of this
-    return df.min(axis=0)
+    result = df.min(axis=0)
+    if np.isnan(sum(result)):
+        raise ValueError('None of the results of this function should be NaN')
+    return result
 
 
 def selected_set_index(df: pd.DataFrame, indices: List[int]):
@@ -19,7 +22,10 @@ def selected_set_index(df: pd.DataFrame, indices: List[int]):
     df = df.iloc[indices]
     # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
     # then we take the median of this
-    return df.min(axis=0)
+    result = df.min(axis=0)
+    if np.isnan(sum(result)):
+        raise ValueError('None of the results of this function should be NaN')
+    return result
 
 
 def reshape_configs(df, params, resized_grid_size):

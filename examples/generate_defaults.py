@@ -1,4 +1,5 @@
 import argparse
+import openmlcontrib
 import openmldefaults
 import os
 import pickle
@@ -18,7 +19,23 @@ def parse_args():
     return parser.parse_args()
 
 
-def _run_single_solver(model, df, dataset_path, resized_grid_size, num_defaults, output_dir, holdout_indices):
+def _postprocess_defaults(config_space, defaults_orig):
+    # post process defaults (apply json loads and stuff)
+    post_processed_defaults = []
+    for defaults_setting in defaults_orig:
+        for key, value in defaults_setting.items():
+            defaults_setting[key] = openmldefaults.config_spaces.reinstantiate_parameter_value(value)
+
+        active_parameters = openmlcontrib.legacy.get_active_hyperparameters(config_space, defaults_setting)
+        post_processed_default = {}
+        for param in defaults_setting:
+            if param in active_parameters:
+                post_processed_default[param] = defaults_setting[param]
+        post_processed_defaults.append(post_processed_default)
+    return post_processed_defaults
+
+
+def _run_single_solver(model, df, dataset_path, config_space, resized_grid_size, num_defaults, output_dir, holdout_indices):
     print(openmldefaults.utils.get_time(), 'Started on model: %s' % model.name)
     solver_dir = model.name
     dataset_dir = os.path.basename(dataset_path)
@@ -35,14 +52,17 @@ def _run_single_solver(model, df, dataset_path, resized_grid_size, num_defaults,
             return pickle.load(fp)
 
     results_dict = model.generate_defaults(df, num_defaults)
+    results_dict['defaults'] = _postprocess_defaults(config_space, results_dict['defaults'])
+    
     os.makedirs(experiment_dir, exist_ok=True)
     with open(experiment_file, 'wb') as fp:
         pickle.dump(results_dict, fp)
 
-    sum_of_scores = sum(openmldefaults.utils.selected_set(df, results_dict['indices']))
+    print(results_dict)
+    sum_of_scores = sum(openmldefaults.utils.selected_set_index(df, results_dict['indices']))
     diff = abs(sum_of_scores - results_dict['objective'])
     assert diff < 0.0001, 'Sum of scores does not equal score of solution: %f vs %f' % (sum_of_scores,
-                                                                                        results_dict['score'])
+                                                                                        results_dict['objective'])
     return results_dict
 
 
@@ -53,6 +73,8 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
 
     print(openmldefaults.utils.get_time(), '=== NUM DEFAULTS: %d ===' % num_defaults)
     df = openmldefaults.utils.load_dataset(dataset_path, params, resized_grid_size, flip_performances)
+    meta_data = openmldefaults.utils.get_dataset_metadata(dataset_path)
+    config_space = openmldefaults.config_spaces.get_search_space(meta_data['classifier'], meta_data['config_space'])
 
     if determine_pareto:
         # pareto front
@@ -72,6 +94,7 @@ def run(dataset_path, flip_performances, params, resized_grid_size, num_defaults
 
     for model in models:
         results[model.name] = _run_single_solver(model=model, df=df, dataset_path=dataset_path,
+                                                 config_space=config_space,
                                                  resized_grid_size=resized_grid_size,
                                                  num_defaults=num_defaults, output_dir=output_dir,
                                                  holdout_indices=holdout_indices)

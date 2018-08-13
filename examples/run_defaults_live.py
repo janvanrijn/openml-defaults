@@ -22,13 +22,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def json_loads_defaults(defaults):
-    for idx, default in enumerate(defaults):
-        for param, value in default.items():
-            defaults[idx][param] = openmldefaults.config_spaces.reinstantiate_parameter_value(value)
-    return defaults
-
-
 def run(args):
     print(openmldefaults.utils.get_time(), args)
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
@@ -76,9 +69,14 @@ def run(args):
         'imputation__fill_empty': -1,
         'hotencoding__handle_unknown': 'ignore'
     }
+    # adds random state parameters
     for param in estimator.get_params():
         if param.endswith('random_state'):
             additional_params[param] = args.random_state
+    if 'steps' in estimator.get_params():
+        for step_name, sklearn_obj in estimator.get_params()['steps']:
+            if isinstance(sklearn_obj, sklearn.preprocessing.StandardScaler):
+                additional_params[step_name + '__with_mean'] = False
 
     estimator.set_params(**additional_params)
 
@@ -86,19 +84,19 @@ def run(args):
     param_grid = openmldefaults.search.config_space_to_dist(config_space)
 
     scheduled_strategies = collections.OrderedDict()
-    generated_defaults = json_loads_defaults(generated_defaults)
 
     search_scorer = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
 
+    n_jobs = -1
     scheduled_strategies[args.model_name] = openmldefaults.search.DefaultSearchCV(estimator, generated_defaults,
-                                                                                  scoring=search_scorer, n_jobs=-1)
+                                                                                  scoring=search_scorer, n_jobs=n_jobs)
     for i in range(1, 5):
         search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator,
                                                                      param_grid,
                                                                      args.num_defaults * i,
                                                                      scoring=search_scorer,
                                                                      random_state=args.random_state,
-                                                                     n_jobs=-1)
+                                                                     n_jobs=n_jobs)
         scheduled_strategies['random_search_x%d' % i] = search_strategy
 
     for strategy, search_estimator in scheduled_strategies.items():

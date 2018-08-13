@@ -45,14 +45,13 @@ class CppDefaults(object):
         if solution is None:
             raise ValueError('Did not interpret solution correctly')
 
-        selected_indices = {df.index[idx] for idx in solution['solution']}
         selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx) for idx in solution['solution']]
         print(openmldefaults.utils.get_time(), selected_defaults)
 
         results_dict = {
             'branch_and_bound': solution['branch_and_bound'],
             'defaults': selected_defaults,
-            'indices': selected_indices,
+            'indices': solution['solution'],
             'leafs_visited': solution['leafs_visited'],
             'nodes_visited': solution['nodes_visited'],
             'objective': solution['score'],
