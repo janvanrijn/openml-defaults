@@ -32,7 +32,8 @@ def cast_columns_of_dataframe(df, params, meta_data):
         if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter) or \
                 (isinstance(hyperparameter, ConfigSpace.Constant) and isinstance(hyperparameter.value, int)) or \
                 (isinstance(hyperparameter, ConfigSpace.UnParametrizedHyperparameter) and isinstance(hyperparameter.value, int)):
-            df[param] = df[param].astype(int)
+            # limitation of pandas: can't mix nan and integer
+            df[param] = df[param].dropna().apply(lambda x: str(int(x)))
     return df
 
 
