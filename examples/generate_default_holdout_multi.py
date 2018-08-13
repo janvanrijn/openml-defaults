@@ -50,11 +50,17 @@ if __name__ == '__main__':
              ['classifier__bootstrap', 'classifier__criterion', 'classifier__max_depth', 'classifier__max_features',
               'classifier__max_leaf_nodes', 'classifier__min_samples_leaf', 'classifier__min_samples_split',
               'classifier__min_weight_fraction_leaf', 'classifier__n_estimators', 'imputation__strategy']),
-        'wistuba_svm':
-            (os.path.expanduser('~') + '/data/openml-defaults/svm-ongrid.arff',
-             50,
+        ('libsvm_svc', 'predictive_accuracy'):
+            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__predictive_accuracy__c8.arff',
+             100,
              True,
-             ['kernel_rbf', 'kernel_poly', 'kernel_linear', 'c', 'gamma', 'degree'])
+             ['classifier__C', 'classifier__coef0', 'classifier__degree', 'classifier__gamma', 'classifier__kernel']),
+        ('libsvm_svc', 'f_measure'):
+            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__f_measure__c8.arff',
+             100,
+             True,
+             ['classifier__C', 'classifier__coef0', 'classifier__degree', 'classifier__gamma', 'classifier__kernel']),
+
     }
 
     datasets_to_run = datasets
