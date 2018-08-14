@@ -7,7 +7,6 @@ class DefaultSearchCV(BaseSearchCV):
                  fit_params=None, n_jobs=1, iid='warn', refit=True, cv=None,
                  verbose=0, pre_dispatch='2*n_jobs',
                  error_score='raise', return_train_score="warn"):
-        DefaultSearchCV._verify_defaults(defaults)
         self.defaults = defaults
         self.param_distributions = DefaultSearchCV._determine_param_distributions(defaults)
         super(DefaultSearchCV, self).__init__(
@@ -15,20 +14,6 @@ class DefaultSearchCV(BaseSearchCV):
             n_jobs=n_jobs, iid=iid, refit=refit, cv=cv, verbose=verbose,
             pre_dispatch=pre_dispatch, error_score=error_score,
             return_train_score=return_train_score)
-
-    @staticmethod
-    def _verify_defaults(defaults):
-        if not isinstance(defaults, list):
-            raise ValueError()
-        expected_keys = None
-        for default in defaults:
-            if not isinstance(default, dict):
-                raise ValueError()
-            if expected_keys is None:
-                expected_keys = default.keys()
-            else:
-                if expected_keys != default.keys():
-                    raise ValueError()
 
     @staticmethod
     def _determine_param_distributions(defaults):
