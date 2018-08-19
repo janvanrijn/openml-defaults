@@ -12,7 +12,7 @@ def parse_args():
                         default=os.path.expanduser('~') + '/data/openml-defaults/'
                                                           'surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--input_dir', type=str,
-                        default=os.path.expanduser('~') + '/experiments/openml-defaults/live_random_search')
+                        default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--dir_structure', type=str, nargs='+', default=['strategy_name', 'configuration_specification', 'task_id'])
     return parser.parse_args()
 
