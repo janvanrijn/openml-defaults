@@ -39,7 +39,16 @@ def load_result(base_directory, recursed_directories, required_dir_structure, sc
 
 def recurse(base_directory, recursed_directories, required_dir_structure, scoring):
     if len(recursed_directories) == len(required_dir_structure):
-        return load_result(base_directory, recursed_directories, required_dir_structure, scoring)
+        current_dir = construct_path(base_directory, recursed_directories)
+        # assumption: if description exists, the run exists
+        if os.path.isfile(os.path.join(current_dir, 'description.xml')):
+            return load_result(base_directory,
+                               recursed_directories,
+                               required_dir_structure,
+                               scoring)
+        else:
+            # description does not exists
+            return None
 
     result = None
     current_dir = construct_path(base_directory, recursed_directories)
@@ -50,7 +59,7 @@ def recurse(base_directory, recursed_directories, required_dir_structure, scorin
                             scoring)
         if result is None:
             result = subresult
-        else:
+        elif subresult is not None:
             result = result.append(subresult)
     return result
 
