@@ -12,7 +12,7 @@ def parse_args():
                         default=os.path.expanduser('~') + '/data/openml-defaults/'
                                                           'surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--input_dir', type=str,
-                        default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults/live_random_search')
+                        default=os.path.expanduser('~') + '/experiments/openml-defaults/live_random_search')
     parser.add_argument('--dir_structure', type=str, nargs='+', default=['strategy_name', 'configuration_specification', 'task_id'])
     return parser.parse_args()
 
@@ -58,7 +58,7 @@ def recurse(base_directory, recursed_directories, required_dir_structure, scorin
 def run():
     args = parse_args()
     if not os.path.isdir(args.input_dir):
-        raise ValueError()
+        raise ValueError('Input directory does not exists: %s' %args.input_dir)
     dataset_name = os.path.basename(args.dataset_path)
     strategies_dir = os.path.join(args.input_dir, dataset_name, 'live_random_search')
     if not os.path.isdir(strategies_dir):
