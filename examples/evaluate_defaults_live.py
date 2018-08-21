@@ -2,11 +2,15 @@ import argparse
 import collections
 import copy
 import matplotlib.pyplot as plt
+from collections import defaultdict
+
 import openml
 import openmldefaults
 import os
+import pandas as pd
 import warnings
 
+from examples.assemble_results import run as assemble_results
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
 def parse_args():
@@ -21,18 +25,24 @@ def parse_args():
     parser.add_argument('--input_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
     parser.add_argument('--vs_strategy', type=str, default='greedy')
+    parser.add_argument('--dir_structure', type=str, nargs='+',
+                        default=['strategy_name', 'configuration_specification', 'task_id'])
     return parser.parse_args()
 
 
-def plot(defaults_strategy_task_score, y_label, output_file):
-    n_figs = len(defaults_strategy_task_score)
+def plot(df, y_label, output_file):
+    default_values = getattr(df, 'n_defaults').unique()
+    n_figs = len(default_values)
     fig = plt.figure(figsize=(4*n_figs, 6))
     axes = [fig.add_subplot(1, n_figs, i) for i in range(1, n_figs + 1)]
-    for i, (num_defaults, strategy_task_score) in enumerate(defaults_strategy_task_score.items()):
-        print([list(task_score.values()) for task_score in strategy_task_score.values()])
-        axes[i].boxplot([list(task_score.values()) for task_score in strategy_task_score.values()])
-        axes[i].set_xticklabels([strategy for strategy in strategy_task_score.keys()], rotation=45, ha='right')
-        axes[i].set_title(str(num_defaults) + ' defaults')
+    print(default_values)
+    for i, default_values in enumerate(sorted(default_values)):
+        df_fixedn = df.loc[df['n_defaults'] == default_values]
+        print(df_fixedn)
+        #print([list(task_score.values()) for task_score in strategy_task_score.values()])
+        #axes[i].boxplot([list(task_score.values()) for task_score in strategy_task_score.values()])
+        #axes[i].set_xticklabels([strategy for strategy in strategy_task_score.keys()], rotation=45, ha='right')
+        #axes[i].set_title(str(num_defaults) + ' defaults')
     axes[0].set_ylabel(y_label)
     plt.tight_layout()
     plt.savefig(output_file)
@@ -40,85 +50,51 @@ def plot(defaults_strategy_task_score, y_label, output_file):
     print(openmldefaults.utils.get_time(), 'saved to', output_file)
 
 
-def normalize_scores(defaults_strategy_task_score, task_minscore, task_maxscore):
-    result = copy.deepcopy(defaults_strategy_task_score)
-    for defaults, strategy_task_score in defaults_strategy_task_score.items():
-        for strategy, task_score in strategy_task_score.items():
-            for task, score in task_score.items():
-                mi = task_minscore[task]
-                ma = task_maxscore[task]
-                if mi < ma:
-                    normalized_score = (score - mi) / (ma - mi)
-                else:
-                    normalized_score = 1.0
-                result[defaults][strategy][task] = normalized_score
-    return result
+def normalize_scores(df, task_minscore, task_maxscore):
+    df = copy.deepcopy(df)
+    df['evaluation'] = df.apply(lambda row:
+                                (row['evaluation'] - task_minscore[row['task_id']]) /
+                                (task_maxscore[row['task_id']] - task_minscore[row['task_id']]))
+    return df
 
 
 def run():
     args = parse_args()
     if not os.path.isdir(args.input_dir):
-        raise ValueError()
+        raise ValueError('Could not locate input directory: %s' % args.input_dir)
+
     dataset_name = os.path.basename(args.dataset_path)
     strategies_dir = os.path.join(args.input_dir, dataset_name, 'live_random_search')
     if not os.path.isdir(strategies_dir):
         raise ValueError('Could not find strategies directory: %s' % strategies_dir)
+    results_file = os.path.join(strategies_dir, 'results.csv')
+    if not os.path.isfile(results_file):
+        print(openmldefaults.utils.get_time(), 'Generating results.csv, this can take a while')
+        assemble_results(args.input_dir, args.dataset_path, args.dir_structure)
+    print(openmldefaults.utils.get_time(), 'results.csv available.')
+    df = pd.read_csv(filepath_or_buffer=results_file, sep=',')
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
 
-    results = collections.OrderedDict()
+    df['c_type'] = df['configuration_specification'].apply(lambda x: int(x.split('_')[0][1:]))
+    df['n_defaults'] = df['configuration_specification'].apply(lambda x: int(x.split('_')[1][1:]))
+    df = df.groupby(['strategy_name', 'task_id', 'n_defaults']).mean().reset_index()
+
+    df = df.loc[df['c_type'] == args.resized_grid_size]
     task_minscores = dict()
     task_maxscores = dict()
-    for strategy in sorted(os.listdir(strategies_dir)):
-        # sorted ensures sorted plots in Python 3.X, not in Python 2.7
-        for setup in sorted(os.listdir(os.path.join(strategies_dir, strategy))):
-            # filter out wrong setups
-            grid_size_str, num_defaults_str = setup.split("_")
-            if grid_size_str != "c" + str(args.resized_grid_size):
-                continue
-            num_defaults = int(num_defaults_str[1:])
-            if args.max_num_defaults is not None and num_defaults > args.max_num_defaults:
-                continue
-            for task_id in os.listdir(os.path.join(strategies_dir, strategy, setup)):
-                result_dir = os.path.join(strategies_dir, strategy, setup, task_id)
-                try:
-                    run = openml.runs.OpenMLRun.from_filesystem(result_dir, expect_model=False)
-                    sklearn_metric, kwargs = openmldefaults.utils.openml_sklearn_metric_fn_mapping(meta_data['scoring'])
-                    evaluation_scores = run.get_metric_fn(sklearn_metric, kwargs)
-                    accuracy_avg = sum(evaluation_scores) / len(evaluation_scores)
-                    if task_id not in task_minscores or accuracy_avg < task_minscores[task_id]:
-                        task_minscores[task_id] = accuracy_avg
-                    if task_id not in task_maxscores or accuracy_avg > task_maxscores[task_id]:
-                        task_maxscores[task_id] = accuracy_avg
-                    random_search_prefix = 'random_search_x'
-                    expected_cv_iterations = 10
-                    if random_search_prefix in strategy:
-                        rs_multiplier = int(strategy[len(random_search_prefix):])
-                        expected_traces = rs_multiplier * num_defaults * expected_cv_iterations
-                    else:
-                        expected_traces = num_defaults * expected_cv_iterations
-                    assert len(run.trace_content) == expected_traces
+    for task_id in getattr(df, 'task_id').unique():
+        df_task = df.loc[df['task_id'] == task_id]
+        task_minscores[task_id] = df_task.evaluation.min()
+        task_maxscores[task_id] = df_task.evaluation.max()
+        if task_minscores[task_id] == task_maxscores[task_id]:
+            raise ValueError('Can\'t normalize if all values are equal.')
 
-                    if num_defaults not in results:
-                        results[num_defaults] = collections.OrderedDict()
-                    if strategy not in results[num_defaults]:
-                        results[num_defaults][strategy] = dict()
-                    results[num_defaults][strategy][task_id] = accuracy_avg
-                except ValueError:
-                    # experiment not terminated yet
-                    pass
-            if num_defaults in results:
-                print(openmldefaults.utils.get_time(),
-                      'Strategy %s %d defaults, loaded %d tasks' % (strategy, num_defaults,
-                                                                    len(results[num_defaults][strategy])))
-            else:
-                warnings.warn('%s Strategy %s %d defaults does not have any results yet' %
-                              (openmldefaults.utils.get_time(), strategy, num_defaults))
-
-    results_normalized = normalize_scores(results, task_minscores, task_maxscores)
-    outputfile_normalized = os.path.join(args.output_dir, "%s_live__normalized.png" % dataset_name)
     outputfile_vanilla = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
-    plot(results, meta_data['scoring'], outputfile_vanilla)
-    plot(results_normalized, meta_data['scoring'], outputfile_normalized)
+    plot(df, meta_data['scoring'], outputfile_vanilla)
+
+    df_normalized = normalize_scores(df, task_minscores, task_maxscores)
+    outputfile_normalized = os.path.join(args.output_dir, "%s_live__normalized.png" % dataset_name)
+    plot(df_normalized, meta_data['scoring'], outputfile_normalized)
 
 
 if __name__ == '__main__':
