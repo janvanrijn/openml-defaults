@@ -74,8 +74,9 @@ def run():
         raise ValueError('Could not find strategies directory: %s' % strategies_dir)
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
     results = recurse(strategies_dir, [], args.dir_structure, meta_data['scoring'])
-    print(results)
-    results.to_csv(os.path.join(args.input_dir, dataset_name, 'live_random_search', 'results.csv'), sep=',')
+    result_path = os.path.join(args.input_dir, dataset_name, 'live_random_search', 'results.csv')
+    results.to_csv(result_path, sep=',')
+    print('Saved to %s' %result_path)
     pass
 
 
