@@ -32,7 +32,7 @@ def load_result(base_directory, recursed_directories, required_dir_structure, sc
     sklearn_metric, kwargs = openmldefaults.utils.openml_sklearn_metric_fn_mapping(scoring)
     evaluation_scores = run.get_metric_fn(sklearn_metric, kwargs)
     evaluation_avg = sum(evaluation_scores) / len(evaluation_scores)
-    row = {key: value for key, value in zip(recursed_directories, required_dir_structure)}
+    row = {key: value for key, value in zip(required_dir_structure, recursed_directories)}
     row['evaluation'] = evaluation_avg
     return pd.DataFrame([row])
 
@@ -75,7 +75,7 @@ def run():
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
     results = recurse(strategies_dir, [], args.dir_structure, meta_data['scoring'])
     print(results)
-    results.to_csv(os.path.join(args.input_dir, 'results.csv'), sep=',')
+    results.to_csv(os.path.join(args.input_dir, dataset_name, 'live_random_search', 'results.csv'), sep=',')
     pass
 
 
