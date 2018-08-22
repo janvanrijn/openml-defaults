@@ -31,18 +31,24 @@ def parse_args():
 
 
 def plot(df, y_label, output_file):
-    default_values = getattr(df, 'n_defaults').unique()
-    n_figs = len(default_values)
+    unique_ndefaults = getattr(df, 'n_defaults').unique()
+    unique_strategies = df.strategy_name.unique()
+    n_figs = len(unique_ndefaults)
     fig = plt.figure(figsize=(4*n_figs, 6))
     axes = [fig.add_subplot(1, n_figs, i) for i in range(1, n_figs + 1)]
-    print(default_values)
-    for i, default_values in enumerate(sorted(default_values)):
-        df_fixedn = df.loc[df['n_defaults'] == default_values]
-        print(df_fixedn)
-        #print([list(task_score.values()) for task_score in strategy_task_score.values()])
-        #axes[i].boxplot([list(task_score.values()) for task_score in strategy_task_score.values()])
-        #axes[i].set_xticklabels([strategy for strategy in strategy_task_score.keys()], rotation=45, ha='right')
-        #axes[i].set_title(str(num_defaults) + ' defaults')
+    for i, num_defaults in enumerate(sorted(unique_ndefaults)):
+        strategy_scores = []
+        strategy_names = []
+        for strategy in unique_strategies:
+            df_fixedstrategy = df.loc[(df['strategy_name'] == strategy) &
+                                      (df['n_defaults'] == num_defaults)]
+            current_scores = df_fixedstrategy['evaluation'].tolist()
+            strategy_scores.append(current_scores)
+            strategy_names.append(strategy)
+            assert(len(df_fixedstrategy) <= 100) # depends on study
+        axes[i].boxplot(strategy_scores)
+        axes[i].set_xticklabels(strategy_names, rotation=45, ha='right')
+        axes[i].set_title(str(num_defaults) + ' defaults')
     axes[0].set_ylabel(y_label)
     plt.tight_layout()
     plt.savefig(output_file)
@@ -51,10 +57,17 @@ def plot(df, y_label, output_file):
 
 
 def normalize_scores(df, task_minscore, task_maxscore):
+    def normalize(row):
+        eval = row['evaluation']
+        min_score = task_minscore[row['task_id']]
+        max_score = task_maxscore[row['task_id']]
+        if min_score != max_score:
+            return (eval - min_score) / (max_score - min_score)
+        else:
+            return min_score
+
     df = copy.deepcopy(df)
-    df['evaluation'] = df.apply(lambda row:
-                                (row['evaluation'] - task_minscore[row['task_id']]) /
-                                (task_maxscore[row['task_id']] - task_minscore[row['task_id']]))
+    df['evaluation'] = df.apply(lambda row: normalize(row), axis=1)
     return df
 
 
@@ -84,10 +97,11 @@ def run():
     task_maxscores = dict()
     for task_id in getattr(df, 'task_id').unique():
         df_task = df.loc[df['task_id'] == task_id]
-        task_minscores[task_id] = df_task.evaluation.min()
-        task_maxscores[task_id] = df_task.evaluation.max()
-        if task_minscores[task_id] == task_maxscores[task_id]:
-            raise ValueError('Can\'t normalize if all values are equal.')
+        task_min = df_task.evaluation.min()
+        task_max = df_task.evaluation.max()
+
+        task_minscores[task_id] = task_min
+        task_maxscores[task_id] = task_max
 
     outputfile_vanilla = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
     plot(df, meta_data['scoring'], outputfile_vanilla)
