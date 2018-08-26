@@ -109,8 +109,8 @@ def run(args):
         scheduled_strategies['random_search__%d' % n_iterations] = search_strategy
 
     for strategy, search_estimator in scheduled_strategies.items():
-        output_dir_strategy = os.path.join(args.experiment_prefix,
-                                           args.defaults_dir,
+        output_dir_strategy = os.path.join(args.defaults_dir,
+                                           args.experiment_prefix,
                                            dataset_dir,
                                            'live_random_search',
                                            str(args.resized_grid_size),
