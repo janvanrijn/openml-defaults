@@ -11,6 +11,7 @@ import sklearn
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--experiment_prefix', type=str, default='20180826')
     parser.add_argument('--dataset_path', type=str, default=os.path.expanduser('~') +
                         '/data/openml-defaults/surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--task_idx', type=int, default=0)
@@ -108,7 +109,8 @@ def run(args):
         scheduled_strategies['random_search__%d' % n_iterations] = search_strategy
 
     for strategy, search_estimator in scheduled_strategies.items():
-        output_dir_strategy = os.path.join(args.defaults_dir,
+        output_dir_strategy = os.path.join(args.experiment_prefix,
+                                           args.defaults_dir,
                                            dataset_dir,
                                            'live_random_search',
                                            str(args.resized_grid_size),
