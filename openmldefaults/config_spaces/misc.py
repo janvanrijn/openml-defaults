@@ -1,6 +1,10 @@
+import ConfigSpace
 import json
 import numpy as np
+import openmlcontrib
 import openmldefaults
+
+from typing import Dict
 
 
 def get_search_space(search_space, type):
@@ -36,27 +40,26 @@ def reinstantiate_parameter_value(value):
     return json.loads(value)
 
 
-def prefix(prefix_str, show):
-    if show:
-        return prefix_str + "__"
-    else:
-        return ""
+def prefix_hyperparameter_name(hyperparameter: ConfigSpace.hyperparameters.Hyperparameter):
+    return hyperparameter.meta['component'] + '__' + hyperparameter.name
 
 
-def prefix_mapping(config_space_fn):
+def dict_to_prefixed_dict(hyperparameter_value, config_space):
+    result = dict()
+    for hyperparameter, value in hyperparameter_value.items():
+        param = config_space.get_hyperparameter(hyperparameter)
+        result[prefix_hyperparameter_name(param)] = value
+    return result
+
+
+def check_in_configuration(config_space: ConfigSpace.ConfigurationSpace, param_values: Dict, allow_inactive_with_values: bool):
     """
-    Returns a dict mapping names of config space without prefix to names of config space with prefix
+    should be removed asap
     """
-    config_space_with_prefix = config_space_fn(True)
-    config_space_without_prefix = config_space_fn(False)
+    param_values = dict(param_values)
 
-    mapping = dict()
-    for hyperparameter in config_space_with_prefix.get_hyperparameters():
-        for alternative in config_space_without_prefix.get_hyperparameters():
-            if hyperparameter.name.endswith(alternative.name):
-                if alternative.name in mapping:
-                    raise ValueError()
-                else:
-                    mapping[alternative.name] = hyperparameter.name
-
-    return mapping
+    for name in param_values.keys():
+        if openmlcontrib.legacy.interpret_hyperparameter_as_string(config_space.get_hyperparameter(name)):
+            param_values[name] = str(param_values[name])
+    ConfigSpace.Configuration(config_space, param_values,
+                              allow_inactive_with_values=allow_inactive_with_values)

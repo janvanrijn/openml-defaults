@@ -6,6 +6,8 @@ import numpy as np
 import openmldefaults
 import pandas as pd
 
+from typing import List
+
 
 def get_setup_dirname(resized_grid_size, num_defaults):
     return 'c%d_d%d' % (resized_grid_size, num_defaults)
@@ -24,8 +26,7 @@ def get_meta_data_config_space(meta_data):
     return cs_fn()
 
 
-def cast_columns_of_dataframe(df, params, meta_data):
-    config_space = get_meta_data_config_space(meta_data)
+def cast_columns_of_dataframe(df: pd.DataFrame, params: List, config_space: ConfigSpace.ConfigurationSpace):
     for param in params:
         hyperparameter = config_space.get_hyperparameter(param)
 
@@ -42,7 +43,7 @@ def get_dataset_metadata(dataset_path):
         first_line = fp.readline()
         if first_line[0] != '%':
             raise ValueError('arff data file should start with comment for meta-data')
-        meta_data = json.loads(first_line[1:])
+    meta_data = json.loads(first_line[1:])
     return meta_data
 
 
@@ -62,7 +63,8 @@ def load_dataset(dataset_path, params, resized_grid_size, flip_performances, con
         columns = [column_name for column_name, colum_type in dataset['attributes']]
         df = pd.DataFrame(data=dataset['data'], columns=columns)
         if meta_data is not None:
-            df = cast_columns_of_dataframe(df, params, meta_data)
+            config_space = get_meta_data_config_space(meta_data)
+            df = cast_columns_of_dataframe(df, params, config_space)
     else:
         raise ValueError()
     print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)

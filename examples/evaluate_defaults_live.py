@@ -44,7 +44,7 @@ def plot(df, y_label, output_file):
                                       (df['n_defaults'] == num_defaults)]
             current_scores = df_fixedstrategy['evaluation'].tolist()
             strategy_scores.append(current_scores)
-            strategy_names.append(strategy)
+            strategy_names.append("%s (n=%d)" %(strategy, len(current_scores)))
             assert(len(df_fixedstrategy) <= 100) # depends on study
         axes[i].boxplot(strategy_scores)
         axes[i].set_xticklabels(strategy_names, rotation=45, ha='right')

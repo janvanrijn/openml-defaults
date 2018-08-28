@@ -64,21 +64,21 @@ def recurse(base_directory, recursed_directories, required_dir_structure, scorin
     return result
 
 
-def run():
-    args = parse_args()
-    if not os.path.isdir(args.input_dir):
-        raise ValueError('Input directory does not exists: %s' %args.input_dir)
-    dataset_name = os.path.basename(args.dataset_path)
-    strategies_dir = os.path.join(args.input_dir, dataset_name, 'live_random_search')
+def run(input_dir, dataset_path, dir_structure):
+    if not os.path.isdir(input_dir):
+        raise ValueError('Input directory does not exists: %s' % input_dir)
+    dataset_name = os.path.basename(dataset_path)
+    strategies_dir = os.path.join(input_dir, dataset_name, 'live_random_search')
     if not os.path.isdir(strategies_dir):
         raise ValueError('Could not find strategies directory: %s' % strategies_dir)
-    meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
-    results = recurse(strategies_dir, [], args.dir_structure, meta_data['scoring'])
-    result_path = os.path.join(args.input_dir, dataset_name, 'live_random_search', 'results.csv')
+    meta_data = openmldefaults.utils.get_dataset_metadata(dataset_path)
+    results = recurse(strategies_dir, [], dir_structure, meta_data['scoring'])
+    result_path = os.path.join(input_dir, dataset_name, 'live_random_search', 'results.csv')
     results.to_csv(path_or_buf=result_path, sep=',')
     print('Saved to %s' %result_path)
     pass
 
 
 if __name__ == '__main__':
-    run()
+    args_ = parse_args()
+    run(args_.input_dir, args_.dataset_path, args_.dir_structure)

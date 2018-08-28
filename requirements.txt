@@ -1,4 +1,4 @@
-ConfigSpace
+ConfigSpace==0.4.7
 Cython
 feather-format
 liac-arff
