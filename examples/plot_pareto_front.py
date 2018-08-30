@@ -21,18 +21,20 @@ def parse_args():
     parser.add_argument('--num_defaults', type=int, default=3)
     parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     parser.add_argument('--condition_on', type=json.loads, default=None)
+    parser.add_argument('--jitter_degree', type=float, default=0.0)
+    parser.add_argument('--output_format', type=str, default='pdf')
     return parser.parse_args()
 
 
-def rand_jitter(arr):
-    stdev = .01*(max(arr)-min(arr))
+def rand_jitter(arr, jitter_degree):
+    stdev = jitter_degree*(max(arr)-min(arr))
     return arr + np.random.randn(len(arr)) * stdev
 
 
-def plot_numeric(ax, name, x_series_dominated, y_series_dominated):
+def plot_numeric(ax, name, x_series_dominated, y_series_dominated, jitter_degree):
     if len(x_series_dominated) > 0:
-        ax.scatter(rand_jitter(x_series_dominated.tolist()),
-                   rand_jitter(y_series_dominated.tolist()),
+        ax.scatter(rand_jitter(x_series_dominated.tolist(), jitter_degree),
+                   rand_jitter(y_series_dominated.tolist(), jitter_degree),
                    label=name)
 
 
@@ -56,24 +58,28 @@ def run(args):
 
     dataset_name = os.path.basename(args.dataset_path)
     experiment_dataset_dir = os.path.join(args.experiment_dir, dataset_name)
-    for solver_name in os.listdir(experiment_dataset_dir):
-        results_file = os.path.join(experiment_dataset_dir,
-                                    solver_name,
-                                    openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults),
-                                    'results.pkl')
-        if not os.path.isfile(results_file):
-            print(openmldefaults.utils.get_time(), 'Warning: No results.pkl for %s' % solver_name)
-            continue
-        with open(results_file, 'rb') as fp:
-            results = pickle.load(fp)
-            category_name = '%s_d%d' % (solver_name, args.num_defaults)
-            category_df[category_name] = df_orig.loc[results['defaults']]
-            if len(category_df[category_name]) != args.num_defaults:
-                raise ValueError()
+    if os.path.isdir(experiment_dataset_dir):
+        for solver_name in os.listdir(experiment_dataset_dir):
+            results_file = os.path.join(experiment_dataset_dir,
+                                        solver_name,
+                                        openmldefaults.utils.get_setup_dirname(args.resized_grid_size, args.num_defaults),
+                                        'results.pkl')
+            if not os.path.isfile(results_file):
+                print(openmldefaults.utils.get_time(), 'Warning: No results.pkl for %s' % solver_name)
+                continue
+            with open(results_file, 'rb') as fp:
+                results = pickle.load(fp)
+                category_name = '%s_d%d' % (solver_name, args.num_defaults)
+                category_df[category_name] = df_orig.loc[results['defaults']]
+                if len(category_df[category_name]) != args.num_defaults:
+                    raise ValueError()
 
     for i in range(len(plot_params)-1):
         for j in range(i + 1, len(plot_params)):
-            current_ax = axes[i, j-1]
+            if plot_params > 2:
+                current_ax = axes[i, j-1]
+            else:
+                current_ax = axes
             current_ax.set_xlabel(plot_params[i])
             current_ax.set_ylabel(plot_params[j])
 
@@ -86,7 +92,7 @@ def run(args):
                 y_numeric = np.issubdtype(y_series.dtype, np.number)
 
                 if x_numeric and y_numeric:
-                    plot_numeric(current_ax, name, x_series, y_series)
+                    plot_numeric(current_ax, name, x_series, y_series, args.jitter_degree)
                 elif x_numeric:
                     print(y_series)
                     raise ValueError('Non numeric column: %s' % (plot_params[j]))
@@ -101,8 +107,9 @@ def run(args):
     axes[0, 0].legend()
     plt.tight_layout()
     os.makedirs(args.output_dir, exist_ok=True)
-    plt.savefig(os.path.join(args.output_dir, 'params_%s%s.png' % (dataset_name,
-                                                                   json_serialized)))
+    plt.savefig(os.path.join(args.output_dir, 'params_%s%s.%s' % (dataset_name,
+                                                                  json_serialized,
+                                                                  args.output_format)))
 
 
 if __name__ == '__main__':
