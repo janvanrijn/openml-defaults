@@ -13,7 +13,8 @@ def parse_args():
                                                           'surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--input_dir', type=str,
                         default=os.path.expanduser('~') + '/experiments/openml-defaults')
-    parser.add_argument('--dir_structure', type=str, nargs='+', default=['strategy_name', 'configuration_specification', 'task_id'])
+    parser.add_argument('--experiment_prefix', type=str, default='20180826')
+    parser.add_argument('--dir_structure', type=str, nargs='+', default=['configuration_specification', 'strategy_name', 'task_id'])
     return parser.parse_args()
 
 
@@ -64,15 +65,17 @@ def recurse(base_directory, recursed_directories, required_dir_structure, scorin
     return result
 
 
-def run(input_dir, dataset_path, dir_structure):
+def run(input_dir, experiment_prefix, dataset_path, dir_structure):
     if not os.path.isdir(input_dir):
         raise ValueError('Input directory does not exists: %s' % input_dir)
     dataset_name = os.path.basename(dataset_path)
-    strategies_dir = os.path.join(input_dir, dataset_name, 'live_random_search')
+    strategies_dir = os.path.join(input_dir, experiment_prefix, dataset_name, 'live_random_search')
     if not os.path.isdir(strategies_dir):
         raise ValueError('Could not find strategies directory: %s' % strategies_dir)
     meta_data = openmldefaults.utils.get_dataset_metadata(dataset_path)
     results = recurse(strategies_dir, [], dir_structure, meta_data['scoring'])
+    if results is None:
+        raise ValueError('Did not obtain any results from directory: %s' % strategies_dir)
     result_path = os.path.join(input_dir, dataset_name, 'live_random_search', 'results.csv')
     results.to_csv(path_or_buf=result_path, sep=',')
     print('Saved to %s' %result_path)
@@ -81,4 +84,4 @@ def run(input_dir, dataset_path, dir_structure):
 
 if __name__ == '__main__':
     args_ = parse_args()
-    run(args_.input_dir, args_.dataset_path, args_.dir_structure)
+    run(args_.input_dir, args_.experiment_prefix, args_.dataset_path, args_.dir_structure)
