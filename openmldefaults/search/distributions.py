@@ -2,6 +2,7 @@ import ConfigSpace
 import numpy as np
 import openmldefaults
 import scipy
+import skopt
 
 from scipy.stats._distn_infrastructure import rv_continuous, rv_discrete
 
@@ -70,6 +71,41 @@ class loguniform_int_gen(OpenMLDistributionHelper, rv_discrete):
         return np.rint(np.power(base, self._random_state.uniform(
             low=low, high=high, size=self._size))).astype(int)
 loguniform_int = loguniform_int_gen(name='loguniform_int')
+
+
+def config_space_to_skopt(ConfigurationSpace: ConfigSpace.ConfigurationSpace, add_prefix: bool):
+    """
+        Turns config space object into a dict of distributions
+        """
+    result = dict()
+    for hyperparameter in ConfigurationSpace.get_hyperparameters():
+        name = hyperparameter.name
+        if add_prefix:
+            name = openmldefaults.config_spaces.prefix_hyperparameter_name(hyperparameter)
+        if isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter):
+            result[name] = skopt.space.Categorical([openmldefaults.config_spaces.reinstantiate_parameter_value(
+                openmldefaults.config_spaces.post_process(val)) for val in hyperparameter.choices])
+        elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UniformFloatHyperparameter):
+            if hyperparameter.log is True:
+                result[name] = skopt.space.Real(hyperparameter.lower, hyperparameter.upper)
+            else:
+                result[name] = skopt.space.Real(hyperparameter.lower, hyperparameter.upper, prior='log-uniform')
+        elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UniformIntegerHyperparameter):
+            if hyperparameter.log is True:
+                raise NotImplementedError()
+            else:
+                result[name] = skopt.space.Integer(hyperparameter.lower, hyperparameter.upper)
+        elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
+            result[name] = skopt.space.Categorical(
+                [openmldefaults.config_spaces.reinstantiate_parameter_value(
+                 openmldefaults.config_spaces.post_process(hyperparameter.value))])
+        elif isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
+            result[name] = skopt.space.Categorical(
+                [openmldefaults.config_spaces.reinstantiate_parameter_value(
+                 openmldefaults.config_spaces.post_process(hyperparameter.value))])
+        else:
+            raise NotImplementedError()
+    return result
 
 
 def config_space_to_dist(ConfigurationSpace: ConfigSpace.ConfigurationSpace, add_prefix: bool):

@@ -8,6 +8,7 @@ import openmldefaults
 import os
 import pickle
 import sklearn
+import skopt
 
 
 def parse_args():
@@ -19,8 +20,9 @@ def parse_args():
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--num_defaults', type=int, nargs="+", default=[1, 2, 4, 8, 16, 32])
     parser.add_argument('--search_iterations', type=int, nargs="+", default=[1, 2, 4, 8, 16, 32, 64])
+    parser.add_argument('--mbo_iterations', type=int, nargs="+", default=[32])
     parser.add_argument('--random_state', type=int, default=42)
-    parser.add_argument('--n_jobs', type=int, default=-1)
+    parser.add_argument('--n_jobs', type=int, default=1)
     parser.add_argument('--model_name', type=str, default='greedy')
     parser.add_argument('--defaults_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
@@ -111,7 +113,6 @@ def run(args):
     estimator.set_params(**additional_params)
 
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
-    param_grid = openmldefaults.search.config_space_to_dist(config_space, add_prefix=True)
 
     scheduled_strategies = collections.OrderedDict()
 
@@ -137,13 +138,25 @@ def run(args):
                                                   scoring=search_scorer,
                                                   n_jobs=args.n_jobs)
     for n_iterations in args.search_iterations:
-        search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator,
-                                                                     param_grid,
-                                                                     n_iterations,
+        param_grid = openmldefaults.search.config_space_to_dist(config_space, add_prefix=True)
+        search_strategy = sklearn.model_selection.RandomizedSearchCV(estimator=estimator,
+                                                                     param_distributions=param_grid,
+                                                                     n_iter=n_iterations,
                                                                      scoring=search_scorer,
                                                                      random_state=args.random_state,
                                                                      n_jobs=args.n_jobs)
         scheduled_strategies['random_search__%d' % n_iterations] = search_strategy
+
+    for n_iterations in args.mbo_iterations:
+        param_grid = openmldefaults.search.config_space_to_skopt(config_space, add_prefix=True)
+        optimization = skopt.BayesSearchCV(estimator=estimator,
+                                           search_spaces=param_grid,
+                                           n_iter=n_iterations,
+                                           optimizer_kwargs={'base_estimator': 'RF'},
+                                           scoring=search_scorer,
+                                           random_state=args.random_state,
+                                           n_jobs=args.n_jobs)
+        scheduled_strategies['mbo__%d' % n_iterations] = optimization
 
     for strategy, search_estimator in scheduled_strategies.items():
         output_dir_strategy = os.path.join(args.defaults_dir,
