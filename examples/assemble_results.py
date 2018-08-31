@@ -76,7 +76,7 @@ def run(input_dir, experiment_prefix, dataset_path, dir_structure):
     results = recurse(strategies_dir, [], dir_structure, meta_data['scoring'])
     if results is None:
         raise ValueError('Did not obtain any results from directory: %s' % strategies_dir)
-    result_path = os.path.join(input_dir, dataset_name, 'live_random_search', 'results.csv')
+    result_path = os.path.join(strategies_dir, 'results.csv')
     results.to_csv(path_or_buf=result_path, sep=',')
     print('Saved to %s' %result_path)
     pass
