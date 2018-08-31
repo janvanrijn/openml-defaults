@@ -54,6 +54,8 @@ def recurse(base_directory, recursed_directories, required_dir_structure, scorin
     result = None
     current_dir = construct_path(base_directory, recursed_directories)
     for sub_directory in os.listdir(current_dir):
+        if os.path.isfile(sub_directory):
+            continue
         subresult = recurse(base_directory,
                             recursed_directories + [sub_directory],
                             required_dir_structure,
