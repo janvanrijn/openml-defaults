@@ -54,7 +54,7 @@ if __name__ == '__main__':
             (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__predictive_accuracy__c8.arff',
              100,
              True,
-             ['classifier__C', 'classifier__coef0', 'classifier__degree', 'classifier__gamma', 'classifier__kernel']),
+             ['C', 'coef0', 'degree', 'gamma', 'kernel']),
         ('libsvm_svc', 'f_measure'):
             (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__f_measure__c8.arff',
              100,
