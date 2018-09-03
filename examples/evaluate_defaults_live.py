@@ -16,40 +16,31 @@ from examples.assemble_results import run as assemble_results
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/'
-                                'surrogate__adaboost__predictive_accuracy__c8.arff')
-    parser.add_argument('--flip_performances', action='store_true', default=True)
+                        default=os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__predictive_accuracy__c8.arff')
     parser.add_argument('--resized_grid_size', type=int, default=8)
-    parser.add_argument('--max_num_defaults', type=int, default=None)
-    parser.add_argument('--cv_iterations', type=int, default=10)
-    parser.add_argument('--input_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
-    parser.add_argument('--output_dir', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults')
-    parser.add_argument('--vs_strategy', type=str, default='greedy')
-    parser.add_argument('--dir_structure', type=str, nargs='+',
-                        default=['strategy_name', 'configuration_specification', 'task_id'])
+    parser.add_argument('--input_file', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults/20180826/libsvm_svc.csv')
     return parser.parse_args()
 
 
 def plot(df, y_label, output_file):
-    unique_ndefaults = getattr(df, 'n_defaults').unique()
     unique_strategies = df.strategy_name.unique()
-    n_figs = len(unique_ndefaults)
-    fig = plt.figure(figsize=(4*n_figs, 6))
-    axes = [fig.add_subplot(1, n_figs, i) for i in range(1, n_figs + 1)]
-    for i, num_defaults in enumerate(sorted(unique_ndefaults)):
-        strategy_scores = []
-        strategy_names = []
-        for strategy in unique_strategies:
-            df_fixedstrategy = df.loc[(df['strategy_name'] == strategy) &
-                                      (df['n_defaults'] == num_defaults)]
-            current_scores = df_fixedstrategy['evaluation'].tolist()
-            strategy_scores.append(current_scores)
-            strategy_names.append("%s (n=%d)" %(strategy, len(current_scores)))
-            assert(len(df_fixedstrategy) <= 100) # depends on study
-        axes[i].boxplot(strategy_scores)
-        axes[i].set_xticklabels(strategy_names, rotation=45, ha='right')
-        axes[i].set_title(str(num_defaults) + ' defaults')
-    axes[0].set_ylabel(y_label)
+    n_strategies = len(unique_strategies)
+    fig = plt.figure(figsize=(n_strategies, 6))
+    axes = fig.add_subplot(1, 1, 1)
+    #for i, num_defaults in enumerate(sorted(unique_ndefaults)):
+    strategy_scores = []
+    strategy_names = []
+    # TODO: sort strategies by (??) median performance?
+    # TODO: rename strategies to "1 default", "2 defaults", "random search 1 itt", etc
+    for strategy in unique_strategies:
+        df_fixedstrategy = df.loc[(df['strategy_name'] == strategy)]
+        current_scores = df_fixedstrategy['evaluation'].tolist()
+        strategy_scores.append(current_scores)
+        strategy_names.append("%s (n=%d)" %(strategy, len(current_scores)))
+        assert(len(df_fixedstrategy) <= 100) # depends on study
+    axes.boxplot(strategy_scores)
+    axes.set_xticklabels(strategy_names, rotation=45, ha='right')
+    axes.set_ylabel(y_label)
     plt.tight_layout()
     plt.savefig(output_file)
     plt.close()
@@ -73,26 +64,18 @@ def normalize_scores(df, task_minscore, task_maxscore):
 
 def run():
     args = parse_args()
-    if not os.path.isdir(args.input_dir):
-        raise ValueError('Could not locate input directory: %s' % args.input_dir)
+    if not os.path.isfile(args.input_file):
+        raise ValueError('Could not locate input file: %s' % args.input_file)
 
     dataset_name = os.path.basename(args.dataset_path)
-    strategies_dir = os.path.join(args.input_dir, dataset_name, 'live_random_search')
-    if not os.path.isdir(strategies_dir):
-        raise ValueError('Could not find strategies directory: %s' % strategies_dir)
-    results_file = os.path.join(strategies_dir, 'results.csv')
-    if not os.path.isfile(results_file):
-        print(openmldefaults.utils.get_time(), 'Generating results.csv, this can take a while')
-        assemble_results(args.input_dir, args.dataset_path, args.dir_structure)
-    print(openmldefaults.utils.get_time(), 'results.csv available.')
-    df = pd.read_csv(filepath_or_buffer=results_file, sep=',')
+    output_dir = os.path.dirname(args.input_file)
+    df = pd.read_csv(filepath_or_buffer=args.input_file, sep=',')
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
 
-    df['c_type'] = df['configuration_specification'].apply(lambda x: int(x.split('_')[0][1:]))
-    df['n_defaults'] = df['configuration_specification'].apply(lambda x: int(x.split('_')[1][1:]))
-    df = df.groupby(['strategy_name', 'task_id', 'n_defaults']).mean().reset_index()
+    df['n_defaults'] = df['strategy_name'].apply(lambda x: int(x.split('__')[1]))
+    df = df.groupby(['strategy_name', 'task_id']).mean().reset_index()
 
-    df = df.loc[df['c_type'] == args.resized_grid_size]
+    df = df.loc[df['configuration_specification'] == args.resized_grid_size]
     task_minscores = dict()
     task_maxscores = dict()
     for task_id in getattr(df, 'task_id').unique():
@@ -103,11 +86,11 @@ def run():
         task_minscores[task_id] = task_min
         task_maxscores[task_id] = task_max
 
-    outputfile_vanilla = os.path.join(args.output_dir, "%s_live.png" % dataset_name)
+    outputfile_vanilla = os.path.join(output_dir, "%s_live.png" % dataset_name)
     plot(df, meta_data['scoring'], outputfile_vanilla)
 
     df_normalized = normalize_scores(df, task_minscores, task_maxscores)
-    outputfile_normalized = os.path.join(args.output_dir, "%s_live__normalized.png" % dataset_name)
+    outputfile_normalized = os.path.join(output_dir, "%s_live__normalized.png" % dataset_name)
     plot(df_normalized, meta_data['scoring'], outputfile_normalized)
 
 
