@@ -26,9 +26,33 @@ def get_meta_data_config_space(meta_data):
     return cs_fn()
 
 
-def cast_columns_of_dataframe(df: pd.DataFrame, params: List, config_space: ConfigSpace.ConfigurationSpace):
+def get_component_mapping(config_space: ConfigSpace.ConfigurationSpace):
+    """
+    Each hyperparameter has both a name and a meta-field, containing an component prefix.
+    This function returns a mapping from the concatenated component prefix and hyperparameter
+    name to the hyperparameter name (by which it can be obtained from the config space)
+    """
+    result = dict()
+    for param in config_space.get_hyperparameters():
+        component_name = param.meta['component'] + '__' + param.name
+        result[component_name] = param.name
+    return result
+
+
+def get_hyperparameter_from_config_space(config_space: ConfigSpace.ConfigurationSpace, param_name: str, include_component: bool):
+    """
+    returns the hyperparameter, either by name or by combination of name and component prefix
+    """
+    if not include_component:
+        return config_space.get_hyperparameter(param_name)
+    else:
+        mapping = get_component_mapping(config_space)
+        return config_space.get_hyperparameter(mapping[param_name])
+
+
+def cast_columns_of_dataframe(df: pd.DataFrame, params: List, config_space: ConfigSpace.ConfigurationSpace, include_component):
     for param in params:
-        hyperparameter = config_space.get_hyperparameter(param)
+        hyperparameter = get_hyperparameter_from_config_space(config_space, param, include_component)
 
         if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter) or \
                 (isinstance(hyperparameter, ConfigSpace.Constant) and isinstance(hyperparameter.value, int)) or \
@@ -64,7 +88,7 @@ def load_dataset(dataset_path, params, resized_grid_size, flip_performances, con
         df = pd.DataFrame(data=dataset['data'], columns=columns)
         if meta_data is not None:
             config_space = get_meta_data_config_space(meta_data)
-            df = cast_columns_of_dataframe(df, params, config_space)
+            df = cast_columns_of_dataframe(df, params, config_space, True)
     else:
         raise ValueError()
     print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)

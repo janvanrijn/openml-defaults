@@ -60,7 +60,8 @@ def get_defaults(configuration_dir, task_idx, n_defaults, column_idx_task_id, co
         df = df.set_index('default_no')
         df = openmldefaults.utils.cast_columns_of_dataframe(df,
                                                             df.columns.values,
-                                                            config_space)
+                                                            config_space,
+                                                            False)
         result = []
         for i in range(n_defaults):
             row = df.loc[i+1].to_dict()
@@ -112,6 +113,7 @@ def run(args):
 
     estimator.set_params(**additional_params)
 
+    # TODO: always grabs default. parameterize to prevent errors!
     config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
 
     scheduled_strategies = collections.OrderedDict()
