@@ -1,6 +1,5 @@
 import arff
 import ConfigSpace
-import feather
 import json
 import numpy as np
 import openmldefaults
@@ -62,6 +61,7 @@ def get_dataset_metadata(dataset_path):
 
 def load_dataset(dataset_path, params, resized_grid_size, flip_performances, condition_on=None):
     if dataset_path.endswith('.feather'):
+        import feather
         df = feather.read_dataframe(dataset_path)
     elif dataset_path.endswith('.arff'):
         with open(dataset_path, 'r') as fp:
