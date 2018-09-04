@@ -24,6 +24,10 @@ def plot(df, y_label, output_file):
     print(openmldefaults.utils.get_time(), 'saved to', output_file)
 
 
+def count_results(df):
+    print(df.groupby(["strategy_type", "n_defaults"]).agg("count"))
+
+
 def normalize_scores(df, task_minscore, task_maxscore):
     def normalize(row):
         eval = row['evaluation']
@@ -56,6 +60,11 @@ def run():
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
     df = df.loc[df['configuration_specification'] == args.resized_grid_size]
+
+    # print statistics
+    count_results(df)
+
+    # normalize
     task_minscores = dict()
     task_maxscores = dict()
     for task_id in getattr(df, 'task_id').unique():
