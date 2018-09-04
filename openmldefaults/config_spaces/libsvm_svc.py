@@ -48,3 +48,13 @@ def get_libsvm_svc_small_search_space():
     cs.add_condition(coef0_condition)
 
     return cs
+
+
+def get_libsvm_svc_micro_search_space():
+    C = ConfigSpace.UniformFloatHyperparameter("C", 0.03125, 32768, log=True, default_value=1.0, meta={'component': 'classifier'})
+    kernel = ConfigSpace.Constant("kernel", value="rbf", meta={'component': 'classifier'})
+    gamma = ConfigSpace.UniformFloatHyperparameter("gamma", 3.0517578125e-05, 8, log=True, default_value=0.1, meta={'component': 'classifier'})
+
+    cs = ConfigSpace.ConfigurationSpace()
+    cs.add_hyperparameters([C, kernel,  gamma])
+    return cs

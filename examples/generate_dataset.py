@@ -164,14 +164,16 @@ def run(args):
         ignore_parameters = None
     elif args.classifier == 'libsvm_svc':
         flow_id = 7707
-        ignore_parameters = ['max_iter', 'tol', 'strategy', 'shrinking']
+        if args.config_space == 'default':
+            ignore_parameters = ['max_iter', 'tol', 'strategy', 'shrinking']
+        else:
+            ignore_parameters = None
     else:
         raise ValueError('classifier type not recognized')
     config_space_fn = getattr(openmldefaults.config_spaces,
                               'get_%s_%s_search_space' % (args.classifier,
                                                           args.config_space))
-    config_space = config_space_fn(False)
-    config_space_mapping = openmldefaults.config_spaces.prefix_mapping(config_space_fn)
+    config_space = config_space_fn()
     meta_data = {'flow_id': flow_id,
                  'classifier': args.classifier,
                  'config_space': args.config_space,
@@ -211,12 +213,11 @@ def run(args):
     arff_object = openmlcontrib.meta.dataframe_to_arff(df_surrogate,
                                                        'surrogate_%s' % args.classifier,
                                                        json.dumps(meta_data))
-    arff_object['attributes'] = [(config_space_mapping[att_name] if att_name in config_space_mapping else att_name, att_type)
-                                 for att_name, att_type in arff_object['attributes']]
 
-    with open(os.path.join(args.output_directory, 'surrogate__%s__%s__c%d.arff' % (args.classifier,
-                                                                                   args.scoring,
-                                                                                   args.resized_grid_size)), 'w') as fp:
+    with open(os.path.join(args.output_directory, 'surrogate__%s__%s__%s__c%d.arff' % (args.classifier,
+                                                                                       args.config_space,
+                                                                                       args.scoring,
+                                                                                       args.resized_grid_size)), 'w') as fp:
         arff.dump(arff_object, fp)
 
 

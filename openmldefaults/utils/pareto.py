@@ -2,20 +2,16 @@ import pandas as pd
 from typing import Callable
 
 
-def dominates(dominater, dominated, original_index_keys=None):
+def dominates_min(dominater, dominated, original_index_keys=None):
     if dominater.index.names != dominated.index.names:
         raise ValueError()
     if original_index_keys is None:
         original_index_keys = []
     total = 0
     for key in dominater.keys():
-        if dominater[key] >= dominated[key] and key not in original_index_keys:
+        if key not in original_index_keys and dominater[key] >= dominated[key]:
             total += 1
     return total == len(dominater) - len(original_index_keys)
-
-
-def dominates_min(dominater, dominated):
-    return sum([dominater[x] <= dominated[x] for x in range(len(dominater))]) == len(dominater)
 
 
 # fn from: http://code.activestate.com/recipes/578287-multidimensional-pareto-front/

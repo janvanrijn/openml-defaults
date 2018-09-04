@@ -60,8 +60,7 @@ def get_defaults(configuration_dir, task_idx, n_defaults, column_idx_task_id, co
         df = df.set_index('default_no')
         df = openmldefaults.utils.cast_columns_of_dataframe(df,
                                                             df.columns.values,
-                                                            config_space,
-                                                            False)
+                                                            config_space)
         result = []
         for i in range(n_defaults):
             row = df.loc[i+1].to_dict()

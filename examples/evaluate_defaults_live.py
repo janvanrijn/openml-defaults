@@ -27,7 +27,6 @@ def plot(df, y_label, output_file):
     n_strategies = len(unique_strategies)
     fig = plt.figure(figsize=(n_strategies, 6))
     axes = fig.add_subplot(1, 1, 1)
-    #for i, num_defaults in enumerate(sorted(unique_ndefaults)):
     strategy_scores = []
     strategy_names = []
     # TODO: sort strategies by (??) median performance?

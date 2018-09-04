@@ -39,20 +39,9 @@ def get_component_mapping(config_space: ConfigSpace.ConfigurationSpace):
     return result
 
 
-def get_hyperparameter_from_config_space(config_space: ConfigSpace.ConfigurationSpace, param_name: str, include_component: bool):
-    """
-    returns the hyperparameter, either by name or by combination of name and component prefix
-    """
-    if not include_component:
-        return config_space.get_hyperparameter(param_name)
-    else:
-        mapping = get_component_mapping(config_space)
-        return config_space.get_hyperparameter(mapping[param_name])
-
-
-def cast_columns_of_dataframe(df: pd.DataFrame, params: List, config_space: ConfigSpace.ConfigurationSpace, include_component):
+def cast_columns_of_dataframe(df: pd.DataFrame, params: List, config_space: ConfigSpace.ConfigurationSpace):
     for param in params:
-        hyperparameter = get_hyperparameter_from_config_space(config_space, param, include_component)
+        hyperparameter = config_space.get_hyperparameter(param)
 
         if isinstance(hyperparameter, ConfigSpace.UniformIntegerHyperparameter) or \
                 (isinstance(hyperparameter, ConfigSpace.Constant) and isinstance(hyperparameter.value, int)) or \
@@ -88,7 +77,7 @@ def load_dataset(dataset_path, params, resized_grid_size, flip_performances, con
         df = pd.DataFrame(data=dataset['data'], columns=columns)
         if meta_data is not None:
             config_space = get_meta_data_config_space(meta_data)
-            df = cast_columns_of_dataframe(df, params, config_space, True)
+            df = cast_columns_of_dataframe(df, params, config_space)
     else:
         raise ValueError()
     print(openmldefaults.utils.get_time(), 'Original data frame dimensions:', df.shape)
