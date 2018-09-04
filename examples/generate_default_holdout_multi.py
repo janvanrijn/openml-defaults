@@ -51,15 +51,10 @@ if __name__ == '__main__':
               'classifier__max_leaf_nodes', 'classifier__min_samples_leaf', 'classifier__min_samples_split',
               'classifier__min_weight_fraction_leaf', 'classifier__n_estimators', 'imputation__strategy']),
         ('libsvm_svc', 'predictive_accuracy'):
-            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__predictive_accuracy__c8.arff',
+            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__micro__predictive_accuracy__c16.arff',
              100,
              True,
-             ['classifier__C', 'classifier__coef0', 'classifier__degree', 'classifier__gamma', 'classifier__kernel']),
-        ('libsvm_svc', 'f_measure'):
-            (os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__f_measure__c8.arff',
-             100,
-             True,
-             ['classifier__C', 'classifier__coef0', 'classifier__degree', 'classifier__gamma', 'classifier__kernel']),
+             ['C', 'gamma', 'kernel']),
 
     }
 
