@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--mbo_iterations', type=int, nargs="*", default=[32])
     parser.add_argument('--random_state', type=int, default=42)
     parser.add_argument('--n_jobs', type=int, default=-1)
-    parser.add_argument('--model_name', type=str, default='greedy')
+    parser.add_argument('--model_name', type=str, nargs="+", default='greedy')
     parser.add_argument('--defaults_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
 
@@ -117,24 +117,25 @@ def run(args):
     search_scorer = openmldefaults.utils.openml_sklearn_metric_mapping(meta_data['scoring'])
 
     for n_defaults in args.num_defaults:
-        configuration_dir = os.path.join(args.defaults_dir,
-                                         args.experiment_prefix,
-                                         dataset_dir,
-                                         'generated_defaults',
-                                         str(args.resized_grid_size),
-                                         args.model_name)
-        if not os.path.isdir(configuration_dir):
-            raise ValueError('Directory does not exists: %s' % configuration_dir)
-        generated_defaults = get_defaults(configuration_dir,
-                                          args.task_idx,
-                                          n_defaults,
-                                          column_idx_task_id,
-                                          config_space)
-        assert len(generated_defaults) == n_defaults
-        scheduled_strategies['%s__%d' % (args.model_name, n_defaults)] = \
-            openmldefaults.search.DefaultSearchCV(estimator, generated_defaults,
-                                                  scoring=search_scorer,
-                                                  n_jobs=args.n_jobs)
+        for model_name in args.model_name:
+            configuration_dir = os.path.join(args.defaults_dir,
+                                             args.experiment_prefix,
+                                             dataset_dir,
+                                             'generated_defaults',
+                                             str(args.resized_grid_size),
+                                             model_name)
+            if not os.path.isdir(configuration_dir):
+                raise ValueError('Directory does not exists: %s' % configuration_dir)
+            generated_defaults = get_defaults(configuration_dir,
+                                              args.task_idx,
+                                              n_defaults,
+                                              column_idx_task_id,
+                                              config_space)
+            assert len(generated_defaults) == n_defaults
+            scheduled_strategies['%s__%d' % (model_name, n_defaults)] = \
+                openmldefaults.search.DefaultSearchCV(estimator, generated_defaults,
+                                                      scoring=search_scorer,
+                                                      n_jobs=args.n_jobs)
     if args.search_iterations is not None:
         for n_iterations in args.search_iterations:
             param_grid = openmldefaults.search.config_space_to_dist(config_space, add_prefix=True)
