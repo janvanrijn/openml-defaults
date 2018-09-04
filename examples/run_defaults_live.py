@@ -30,10 +30,11 @@ def parse_args():
 
 def get_defaults(configuration_dir, task_idx, n_defaults, column_idx_task_id, config_space):
 
-    def get_original():
+    def get_original(num_defaults):
         correct_holdout_task_dir = None
-        for holdout_tasks_dir in os.listdir(configuration_dir):
-            if not os.path.isdir(os.path.join(configuration_dir, holdout_tasks_dir)):
+        defaults_dir = os.path.join(configuration_dir, str(num_defaults))
+        for holdout_tasks_dir in os.listdir(defaults_dir):
+            if not os.path.isdir(os.path.join(defaults_dir, holdout_tasks_dir)):
                 continue
             try:
                 holdout_tasks = json.loads(holdout_tasks_dir)
@@ -43,7 +44,7 @@ def get_defaults(configuration_dir, task_idx, n_defaults, column_idx_task_id, co
                 correct_holdout_task_dir = holdout_tasks_dir
         if correct_holdout_task_dir is None:
             raise ValueError('Could not find holdout task dir for task: %d' % task_idx)
-        experiment_dir = os.path.join(configuration_dir, correct_holdout_task_dir)
+        experiment_dir = os.path.join(defaults_dir, correct_holdout_task_dir)
         defaults_file = os.path.join(experiment_dir, 'generated_defaults.pkl')
         print(openmldefaults.utils.get_time(), 'Defaults file: %s' % defaults_file)
         if not os.path.isfile(defaults_file):
@@ -61,22 +62,19 @@ def get_defaults(configuration_dir, task_idx, n_defaults, column_idx_task_id, co
         df = openmldefaults.utils.cast_columns_of_dataframe(df,
                                                             df.columns.values,
                                                             config_space)
-        result = []
-        for i in range(n_defaults):
-            row = df.loc[i+1].to_dict()
-            current = {key: openmldefaults.config_spaces.reinstantiate_parameter_value(value) for key, value in row.items()}
-            openmldefaults.config_spaces.check_in_configuration(config_space, current, allow_inactive_with_values=True)
-            current = openmldefaults.config_spaces.dict_to_prefixed_dict(current,
-                                                                         config_space)
-            result.append(current)
-        return result
+        return [df.loc[i+1].to_dict() for i in range(n_defaults)]
 
     arff_file = os.path.join(configuration_dir, 'defaults.arff')
     if os.path.isfile(arff_file):
-        return get_arff(arff_file)
+        unprocessed = get_arff(arff_file)
     else:
-        raise NotImplementedError("TODO@JvR")
-        # return get_original()
+        unprocessed = get_original(n_defaults)
+
+    result = []
+    for current in unprocessed:
+        openmldefaults.config_spaces.check_in_configuration(config_space, current, allow_inactive_with_values=True)
+        result.append(openmldefaults.config_spaces.dict_to_prefixed_dict(current, config_space))
+    return result
 
 
 def run(args):
@@ -112,8 +110,8 @@ def run(args):
 
     estimator.set_params(**additional_params)
 
-    # TODO: always grabs default. parameterize to prevent errors!
-    config_space = getattr(openmldefaults.config_spaces, 'get_%s_default_search_space' % meta_data['classifier'])()
+    config_space = getattr(openmldefaults.config_spaces, 'get_%s_%s_search_space' % (meta_data['classifier'],
+                                                                                     meta_data['config_space']))()
 
     scheduled_strategies = collections.OrderedDict()
 
