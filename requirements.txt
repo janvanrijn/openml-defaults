@@ -8,3 +8,4 @@ pandas
 pulp
 scikit-learn==0.18.1
 scipy
+seaborn

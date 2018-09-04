@@ -1,48 +1,26 @@
 import argparse
-import collections
 import copy
 import matplotlib.pyplot as plt
-from collections import defaultdict
-
-import openml
+import seaborn as sns
 import openmldefaults
 import os
 import pandas as pd
-import warnings
-
-from examples.assemble_results import run as assemble_results
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str,
-                        default=os.path.expanduser('~') + '/data/openml-defaults/surrogate__libsvm_svc__predictive_accuracy__c8.arff')
+                        default=os.path.expanduser('~') + '/data/openml-defaults/surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--resized_grid_size', type=int, default=8)
-    parser.add_argument('--input_file', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults/20180826/libsvm_svc.csv')
+    parser.add_argument('--input_file', type=str, default=os.path.expanduser('~') + '/habanero_experiments/openml-defaults/20180826/surrogate__adaboost__predictive_accuracy__c8.arff/live_random_search/results.csv')
     return parser.parse_args()
 
 
 def plot(df, y_label, output_file):
-    unique_strategies = df.strategy_name.unique()
-    n_strategies = len(unique_strategies)
-    fig = plt.figure(figsize=(n_strategies, 6))
-    axes = fig.add_subplot(1, 1, 1)
-    strategy_scores = []
-    strategy_names = []
-    # TODO: sort strategies by (??) median performance?
-    # TODO: rename strategies to "1 default", "2 defaults", "random search 1 itt", etc
-    for strategy in unique_strategies:
-        df_fixedstrategy = df.loc[(df['strategy_name'] == strategy)]
-        current_scores = df_fixedstrategy['evaluation'].tolist()
-        strategy_scores.append(current_scores)
-        strategy_names.append("%s (n=%d)" %(strategy, len(current_scores)))
-        assert(len(df_fixedstrategy) <= 100) # depends on study
-    axes.boxplot(strategy_scores)
-    axes.set_xticklabels(strategy_names, rotation=45, ha='right')
-    axes.set_ylabel(y_label)
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
+    sns_plot = sns.boxplot(x='n_defaults', y='evaluation', hue='strategy_type', data=df, palette="Set3")
+    fig = sns_plot.get_figure()
+    fig.savefig(output_file)
+    plt.clf()
     print(openmldefaults.utils.get_time(), 'saved to', output_file)
 
 
@@ -71,8 +49,11 @@ def run():
     df = pd.read_csv(filepath_or_buffer=args.input_file, sep=',')
     meta_data = openmldefaults.utils.get_dataset_metadata(args.dataset_path)
 
+    df['strategy_type'] = df['strategy_name'].apply(lambda x: x.split('__')[0])
     df['n_defaults'] = df['strategy_name'].apply(lambda x: int(x.split('__')[1]))
-    df = df.groupby(['strategy_name', 'task_id']).mean().reset_index()
+    df = df.groupby(['strategy_name', 'task_id', 'strategy_type', 'n_defaults']).mean().reset_index()
+    # removed unnamed columns
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
     df = df.loc[df['configuration_specification'] == args.resized_grid_size]
     task_minscores = dict()
