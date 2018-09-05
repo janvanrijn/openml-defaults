@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--mbo_iterations', type=int, nargs="*", default=[32])
     parser.add_argument('--random_state', type=int, default=42)
     parser.add_argument('--n_jobs', type=int, default=-1)
-    parser.add_argument('--model_name', type=str, nargs="+", default='greedy')
+    parser.add_argument('--model_name', type=str, nargs="+", default=['greedy'])
     parser.add_argument('--defaults_dir', type=str, default=os.path.expanduser('~') + '/experiments/openml-defaults')
     return parser.parse_args()
 
