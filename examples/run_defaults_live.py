@@ -17,7 +17,7 @@ def parse_args():
                         '/data/openml-defaults/surrogate__adaboost__predictive_accuracy__c8.arff')
     parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--resized_grid_size', type=int, default=8)
-    parser.add_argument('--num_defaults', type=int, nargs="+", default=[1, 2, 4, 8, 16, 32])
+    parser.add_argument('--num_defaults', type=int, nargs="*", default=[1, 2, 4, 8, 16, 32])
     parser.add_argument('--search_iterations', type=int, nargs="*", default=[1, 2, 4, 8, 16, 32, 64])
     parser.add_argument('--mbo_iterations', type=int, nargs="*", default=[32])
     parser.add_argument('--random_state', type=int, default=42)
