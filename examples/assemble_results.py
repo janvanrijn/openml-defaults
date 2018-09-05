@@ -35,6 +35,7 @@ def load_result(base_directory, recursed_directories, required_dir_structure, sc
     evaluation_avg = sum(evaluation_scores) / len(evaluation_scores)
     row = {key: value for key, value in zip(required_dir_structure, recursed_directories)}
     row['evaluation'] = evaluation_avg
+    row['flow_id'] = run.flow_id
     return pd.DataFrame([row])
 
 
@@ -82,7 +83,7 @@ def run(input_dir, experiment_prefix, dataset_path, dir_structure):
         raise ValueError('Did not obtain any results from directory: %s' % strategies_dir)
     result_path = os.path.join(strategies_dir, 'results.csv')
     results.to_csv(path_or_buf=result_path, sep=',')
-    print('Saved to %s' %result_path)
+    print('Saved to %s' % result_path)
     pass
 
 
