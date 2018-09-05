@@ -87,9 +87,9 @@ def config_space_to_skopt(ConfigurationSpace: ConfigSpace.ConfigurationSpace, ad
                 openmldefaults.config_spaces.post_process(val)) for val in hyperparameter.choices])
         elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UniformFloatHyperparameter):
             if hyperparameter.log is True:
-                result[name] = skopt.space.Real(hyperparameter.lower, hyperparameter.upper)
-            else:
                 result[name] = skopt.space.Real(hyperparameter.lower, hyperparameter.upper, prior='log-uniform')
+            else:
+                result[name] = skopt.space.Real(hyperparameter.lower, hyperparameter.upper)
         elif isinstance(hyperparameter, ConfigSpace.hyperparameters.UniformIntegerHyperparameter):
             if hyperparameter.log is True:
                 raise NotImplementedError()
