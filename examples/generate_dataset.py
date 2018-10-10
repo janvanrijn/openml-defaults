@@ -1,6 +1,5 @@
 import arff
 import argparse
-import ConfigSpace
 import json
 import numpy as np
 import openml
@@ -8,8 +7,6 @@ import openmlcontrib
 import openmldefaults
 import os
 import pandas as pd
-import sklearn
-import sklearn.ensemble
 
 
 def parse_args():
@@ -27,39 +24,15 @@ def parse_args():
     return parser.parse_args()
 
 
-def determine_parameter_order(config_space, ignore_params):
-    order = []
-
-    def iterate_params(params):
-        for param in params:
-            children = config_space.get_children_of(param)
-            if ignore_params is not None and param in ignore_params and len(children) > 0:
-                raise ValueError('Param %s is ignored but has %d child params' % (param.name, len(children)))
-            if ignore_params is None or param.name not in ignore_params:
-                order.append(param.name)
-                iterate_params(children)
-        pass
-
-    unconditionals = [config_space.get_hyperparameter(name) for name in config_space.get_all_unconditional_hyperparameters()]
-    iterate_params(unconditionals)
-    return order
-
-
 def run(args):
     study = openml.study.get_study(args.study_id, 'tasks')
 
     if args.classifier == 'random_forest':
         flow_id = 6969
-        ignore_parameters = None
     elif args.classifier == 'adaboost':
         flow_id = 6970
-        ignore_parameters = None
     elif args.classifier == 'libsvm_svc':
         flow_id = 7707
-        if args.config_space == 'default':
-            ignore_parameters = {'max_iter', 'tol', 'strategy', 'shrinking'}
-        else:
-            ignore_parameters = None
     else:
         raise ValueError('classifier type not recognized')
     config_space_fn = getattr(openmldefaults.config_spaces,
@@ -72,26 +45,26 @@ def run(args):
                  'scoring': args.scoring}
 
     num_params = len(config_space.get_hyperparameter_names())
-    param_order = determine_parameter_order(config_space, ignore_parameters)
-    configurations = openmldefaults.utils.generate_grid_configurations(config_space, param_order, 0, args.resized_grid_size, ignore_parameters)
+    configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
 
     df_orig = pd.DataFrame(configurations)
     print(openmldefaults.utils.get_time(), 'Meta-dataset dimensions: %s' % str(df_orig.shape))
 
-    df_surrogate = df_orig.copy()
+    # copy of df_orig. Prevent copy function for correct type hints
+    df_surrogate = pd.DataFrame(configurations)
     for task_id in study.tasks:
         try:
             estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
                                                                               flow_id,
                                                                               args.num_runs,
                                                                               config_space,
-                                                                              ignore_parameters,
                                                                               args.scoring,
                                                                               args.cache_directory)
         except ValueError as e:
             print('Error at task %d: %s' % (task_id, e))
             continue
         if not np.array_equal(df_orig.columns.values, columns):
+            # if this goes wrong, it is due to the pd.get_dummies() fn
             raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
         surrogate_values = estimator.predict(pd.get_dummies(df_orig).as_matrix())
         df_surrogate['%s_task_%d' % (args.scoring, task_id)] = surrogate_values

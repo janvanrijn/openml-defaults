@@ -7,11 +7,28 @@ import sklearn
 import typing
 
 
+def _determine_parameter_order(config_space: ConfigSpace.ConfigurationSpace) -> typing.List[str]:
+    """
+    Returns the hyperparameters in an order that reflects the chain of
+    dependencies (unconditional hyperparameter first, in case of a tie lexicographically sorted)
+    """
+    order = []
+
+    def iterate_params(param_names: typing.List[str]):
+        for param_name in param_names:
+            param = config_space.get_hyperparameter(param_name)
+            children_names = [c.name for c in config_space.get_children_of(param)]
+            order.append(param_name)
+            iterate_params(children_names)
+
+    unconditionals = sorted(config_space.get_all_unconditional_hyperparameters())
+    iterate_params(unconditionals)
+    return order
+
+
 def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
-                                 param_order: typing.List[str],
                                  current_index: int,
-                                 max_values_per_parameter: int,
-                                 ignore_parameters: typing.Optional[typing.Set[str]]) \
+                                 max_values_per_parameter: int) \
         -> typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]]:
     """
     Given a config space, this generates a grid of hyperparameter values.
@@ -24,6 +41,9 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
             cp[current_name_] = current_value
             result_.append(cp)
         return result_
+
+    param_order = _determine_parameter_order(config_space)
+    assert set(param_order) == set(config_space.get_hyperparameter_names())
 
     if current_index >= len(param_order):
         return [{}]
@@ -57,12 +77,8 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
         else:
             raise ValueError('Could not determine hyperparameter type: %s' % current_hyperparameter.name)
 
-        recursive_configs = generate_grid_configurations(config_space, param_order, current_index+1,
-                                                         max_values_per_parameter,
-                                                         ignore_parameters)
-        if ignore_parameters is not None and current_hyperparameter.name in ignore_parameters:
-            return recursive_configs
-        current_values = [openmldefaults.config_spaces.post_process(value) for value in current_values]
+        recursive_configs = generate_grid_configurations(config_space, current_index+1,
+                                                         max_values_per_parameter)
         result = []
 
         for recursive_config in recursive_configs:
@@ -86,8 +102,7 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
 
 def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
                             config_space: ConfigSpace.ConfigurationSpace,
-                            ignore_parameters: typing.Optional[typing.List],
-                            scoring: typing.List,
+                            evaluation_measure: str,
                             cache_directory: str) \
         -> typing.Tuple[sklearn.pipeline.Pipeline, typing.List]:
     """
@@ -98,26 +113,21 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
     setup_data = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
                                                                        flow_id=flow_id,
                                                                        num_runs=num_runs,
+                                                                       raise_few_runs=False,
                                                                        configuration_space=config_space,
-                                                                       evaluation_measures=scoring,
+                                                                       evaluation_measures=[evaluation_measure],
                                                                        cache_directory=cache_directory)
-    if ignore_parameters is not None:
-        for ignore_parameter in ignore_parameters:
-            del setup_data[ignore_parameter]
-
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
-        if ignore_parameters is not None and hyperparameter in ignore_parameters:
-            continue
         if isinstance(hyperparameter, ConfigSpace.CategoricalHyperparameter):
             for value in hyperparameter.choices:
                 num_occurances = len(setup_data.loc[setup_data[hyperparameter.name] == value])
                 if num_occurances < nominal_values_min:
-                    raise ValueError('Nominal hyperparameter %s value %s does not have' % (hyperparameter.name, value) +
-                                     ' enough values. Required %d, got: %d' % (nominal_values_min, num_occurances))
+                    raise ValueError('Nominal hyperparameter %s value %s does not have enough values. Required '
+                                     '%d, got: %d' % (hyperparameter.name, value, nominal_values_min, num_occurances))
 
-    y = setup_data['y'].values
-    del setup_data['y']
+    y = setup_data[evaluation_measure].values
+    del setup_data[evaluation_measure]
     print(openmldefaults.utils.get_time(), 'Dimensions of meta-data task %d: %s' % (task_id, str(setup_data.shape)))
 
     # TODO: HPO
@@ -127,4 +137,5 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
                                                               random_state=42))
     ])
     surrogate.fit(pd.get_dummies(setup_data).as_matrix(), y)
+    # the column vector is good to return, as the get_dummies function might behave instable
     return surrogate, setup_data.columns.values
