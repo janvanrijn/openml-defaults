@@ -76,7 +76,7 @@ class MipDefaults(object):
 
         results_dict = {
             # 'defaults': set(selected_defaults),
-            'indices': set(selected_indices),
+            'indices': selected_indices,
             'objective': sum(result_frame),
             'run_time': runtime,
         }
