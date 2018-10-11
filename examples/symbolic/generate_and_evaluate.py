@@ -32,7 +32,10 @@ def inverse_transform_fn(param_value: float, meta_feature_value: float) -> float
     # raising is ok
     if meta_feature_value == 0.0:
         raise ZeroDivisionError()
-    return param_value / meta_feature_value
+    result = param_value / meta_feature_value
+    if np.isinf(result):
+        raise OverflowError()
+    return result
 
 
 def power_transform_fn(param_value: float, meta_feature_value: float) -> float:
@@ -88,7 +91,7 @@ def run(args):
 
     config_frame_orig = pd.DataFrame(configurations)
     config_frame_orig.sort_index(axis=1, inplace=True)
-    quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, True, -1, True)
+    quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, False, -1, True)
 
     surrogates = dict()
     for idx, task_id in enumerate(study.tasks):
@@ -114,9 +117,9 @@ def run(args):
 
     results = list()
     for hyperparameter in config_space.get_hyperparameters():
-        logging.info('Started with hyperparameter %s' % hyperparameter.name)
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
             continue
+        logging.info('Started with hyperparameter %s' % hyperparameter.name)
         config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0, args.resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
@@ -149,9 +152,12 @@ def run(args):
                             results.append(current_result)
                             logging.info('Found improvement over base-line: %s' % current_result)
                     except ZeroDivisionError:
-                        logging.warning('Zero division error with (%s, %s, %s). skipping. ' % (transform_name,
-                                                                                               alpha_value,
-                                                                                               meta_feature))
+                        logging.warning('Zero division error with (fn=%s, alpha=%s, meta_f=%s). '
+                                        'skipping. ' % (transform_name, alpha_value, meta_feature))
+                        pass
+                    except OverflowError:
+                        logging.warning('Overflow error with (fn=%s, alpha=%s, meta_f=%s). '
+                                        'skipping. ' % (transform_name, alpha_value, meta_feature))
                         pass
     total = {
         'baseline_configuration': best_config_vanilla,
@@ -159,8 +165,8 @@ def run(args):
         'outperforming': results
     }
     os.makedirs(args.output_directory, exist_ok=True)
-    with open(os.path.join(args.output_directory, 'results.pkl'), 'w') as fp:
-        pickle.dump(total, fp, 0)
+    with open(os.path.join(args.output_directory, 'results.pkl'), 'wb') as fp:
+        pickle.dump(obj=total, file=fp, protocol=0)
 
 
 if __name__ == '__main__':
