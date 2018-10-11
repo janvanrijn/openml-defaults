@@ -74,35 +74,11 @@ def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
     return best_config.to_dict(), best_results
 
 
-def run(args):
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    study = openml.study.get_study(args.study_id, 'tasks')
-    study.tasks = study.tasks
-    if 34536 in study.tasks:
-        study.tasks.remove(34536)
-
-    config_space_fn = getattr(openmldefaults.config_spaces,
-                              'get_%s_%s_search_space' % (args.classifier,
-                                                          args.config_space))
-    config_space = config_space_fn()
-    configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
-
-    config_frame_orig = pd.DataFrame(configurations)
-    config_frame_orig.sort_index(axis=1, inplace=True)
-    quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, False, -1, True)
-
-    surrogates = dict()
-    for idx, task_id in enumerate(study.tasks):
-        logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(study.tasks)))
-        estimator, columns = openmldefaults.utils.train_surrogate_on_task(
-            task_id, config_space.meta['flow_id'], args.num_runs, config_space, args.scoring, args.cache_directory)
-        if not np.array_equal(config_frame_orig.columns.values, columns):
-            # if this goes wrong, it is due to the pd.get_dummies() fn
-            raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
-        surrogates[task_id] = estimator
-
+def run_on_tasks(config_frame_orig: pd.DataFrame,
+                 surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
+                 quality_frame: pd.DataFrame,
+                 config_space: ConfigSpace.ConfigurationSpace,
+                 output_file: str):
     # performance untransformed
     best_config_vanilla, best_results_vanilla = select_best_configuration_across_tasks(
         config_frame_orig, surrogates, config_frame_orig.columns.values, None, None, None, None)
@@ -121,7 +97,8 @@ def run(args):
             continue
         logging.info('Started with hyperparameter %s' % hyperparameter.name)
         config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
-        configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0, args.resized_grid_size)
+        configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0,
+                                                                           args.resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
         for transform_name, transform_fn in transform_fns.items():
             logging.info('- Transformer fn %s' % transform_name)
@@ -169,9 +146,46 @@ def run(args):
         'baseline_avg_performance': best_avg_vanilla,
         'outperforming': results
     }
-    os.makedirs(args.output_directory, exist_ok=True)
-    with open(os.path.join(args.output_directory, 'results.pkl'), 'wb') as fp:
+    with open(output_file, 'wb') as fp:
         pickle.dump(obj=total, file=fp, protocol=0)
+
+
+def run(args):
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    study = openml.study.get_study(args.study_id, 'tasks')
+    study.tasks = study.tasks
+    if 34536 in study.tasks:
+        study.tasks.remove(34536)
+
+    config_space_fn = getattr(openmldefaults.config_spaces,
+                              'get_%s_%s_search_space' % (args.classifier,
+                                                          args.config_space))
+    config_space = config_space_fn()
+    configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
+
+    config_frame_orig = pd.DataFrame(configurations)
+    config_frame_orig.sort_index(axis=1, inplace=True)
+    quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, False, -1, True)
+
+    surrogates = dict()
+    for idx, task_id in enumerate(study.tasks):
+        logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(study.tasks)))
+        estimator, columns = openmldefaults.utils.train_surrogate_on_task(
+            task_id, config_space.meta['flow_id'], args.num_runs, config_space, args.scoring, args.cache_directory)
+        if not np.array_equal(config_frame_orig.columns.values, columns):
+            # if this goes wrong, it is due to the pd.get_dummies() fn
+            raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
+        surrogates[task_id] = estimator
+
+    os.makedirs(args.output_directory, exist_ok=True)
+    output_file = os.path.join(args.output_directory, 'results.pkl')
+    run_on_tasks(config_frame_orig=config_frame_orig,
+                 surrogates=surrogates,
+                 quality_frame=quality_frame,
+                 config_space=config_space,
+                 output_file=output_file)
 
 
 if __name__ == '__main__':
