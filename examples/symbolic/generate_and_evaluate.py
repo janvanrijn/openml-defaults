@@ -159,6 +159,11 @@ def run(args):
                         logging.warning('Overflow error with (fn=%s, alpha=%s, meta_f=%s). '
                                         'skipping. ' % (transform_name, alpha_value, meta_feature))
                         pass
+                    except ValueError:
+                        # keep a close eye on this one. Question: why do the others not catch this one?
+                        logging.warning('Overflow error with (fn=%s, alpha=%s, meta_f=%s). '
+                                        'skipping. ' % (transform_name, alpha_value, meta_feature))
+                        pass
     total = {
         'baseline_configuration': best_config_vanilla,
         'baseline_avg_performance': best_avg_vanilla,
