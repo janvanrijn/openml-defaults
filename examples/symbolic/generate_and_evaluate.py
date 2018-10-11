@@ -46,6 +46,15 @@ def multiply_transform_fn(param_value: float, meta_feature_value: float) -> floa
     return param_value * meta_feature_value
 
 
+def single_prediction(df: pd.DataFrame,
+                      surrogate: sklearn.pipeline.Pipeline,
+                      config: typing.Dict) -> float:
+    # TODO: might break with categoricals
+    df = pd.DataFrame(columns=df.columns.values)
+    df = df.append(config)
+    return surrogate.predict(pd.get_dummies(df).as_matrix())[0]
+
+
 def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
                                            surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
                                            surrogate_train_cols: np.array,
@@ -53,7 +62,7 @@ def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
                                            symbolic_fn: typing.Optional[typing.Callable],
                                            symbolic_alpha_value: typing.Optional[float],
                                            symbolic_mf_values: typing.Optional[typing.Dict[int, float]]) \
-        -> typing.Tuple[pd.Series, np.array]:
+        -> typing.Tuple[typing.Dict, np.array]:
     num_configs = config_frame.shape[0]
     num_tasks = len(surrogates)
     results = np.zeros((num_tasks, num_configs), dtype=np.float)
@@ -78,12 +87,28 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                  surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
                  quality_frame: pd.DataFrame,
                  config_space: ConfigSpace.ConfigurationSpace,
+                 hold_out_task: typing.Optional[int],
+                 resized_grid_size: int,
                  output_file: str):
+    hold_out_surrogate = None
+    if hold_out_task is not None:
+        hold_out_surrogate = surrogates[hold_out_task]
+        surrogates = dict(surrogates)
+        del surrogates[hold_out_task]
+
     # performance untransformed
     best_config_vanilla, best_results_vanilla = select_best_configuration_across_tasks(
         config_frame_orig, surrogates, config_frame_orig.columns.values, None, None, None, None)
     best_avg_vanilla = np.average(best_results_vanilla)
-    logging.info('Baseline: %s [%s] %s' % (best_config_vanilla, best_results_vanilla, best_avg_vanilla))
+    best_hold_out_task = None
+    if hold_out_task is not None:
+        best_hold_out_task = single_prediction(config_frame_orig,
+                                               hold_out_surrogate,
+                                               best_config_vanilla)
+    logging.info('Baseline: %s [%s] %s. Holdout task: %s' % (best_config_vanilla,
+                                                             best_results_vanilla,
+                                                             best_avg_vanilla,
+                                                             best_hold_out_task))
 
     transform_fns = {
         'inverse_transform_fn': inverse_transform_fn,
@@ -98,7 +123,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         logging.info('Started with hyperparameter %s' % hyperparameter.name)
         config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0,
-                                                                           args.resized_grid_size)
+                                                                           resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
         for transform_name, transform_fn in transform_fns.items():
             logging.info('- Transformer fn %s' % transform_name)
@@ -117,14 +142,22 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                         )
                         best_avg_current = np.average(best_results_current)
                         if best_avg_current > best_avg_vanilla:
+                            holdout_score_current = None
+                            if hold_out_surrogate is not None:
+                                symbolic_value = transform_fn(alpha_value, quality_frame[meta_feature][hold_out_task])
+                                best_config_current[hyperparameter.name] = symbolic_value
+                                holdout_score_current = single_prediction(config_frame_orig,
+                                                                          hold_out_surrogate,
+                                                                          best_config_current)
                             current_result = {
                                 'config': best_config_current,
                                 'results': best_results_current,
-                                'avg': best_avg_current,
+                                'avg_score': best_avg_current,
                                 'hyperparameter': hyperparameter.name,
                                 'transform_fn': transform_name,
                                 'alpha_value': alpha_value,
-                                'meta_feature': meta_feature
+                                'meta_feature': meta_feature,
+                                'holdout_score': holdout_score_current,
                             }
                             results.append(current_result)
                             logging.info('Found improvement over base-line: %s' % current_result)
@@ -180,12 +213,15 @@ def run(args):
         surrogates[task_id] = estimator
 
     os.makedirs(args.output_directory, exist_ok=True)
-    output_file = os.path.join(args.output_directory, 'results.pkl')
-    run_on_tasks(config_frame_orig=config_frame_orig,
-                 surrogates=surrogates,
-                 quality_frame=quality_frame,
-                 config_space=config_space,
-                 output_file=output_file)
+    for task_id in study.tasks:
+        output_file = os.path.join(args.output_directory, 'results_%d.pkl' % task_id)
+        run_on_tasks(config_frame_orig=config_frame_orig,
+                     surrogates=surrogates,
+                     quality_frame=quality_frame,
+                     config_space=config_space,
+                     resized_grid_size=args.resized_grid_size,
+                     hold_out_task=task_id,
+                     output_file=output_file)
 
 
 if __name__ == '__main__':
