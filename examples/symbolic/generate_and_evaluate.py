@@ -8,6 +8,7 @@ import openmlcontrib
 import openmldefaults
 import os
 import pandas as pd
+import pickle
 import sklearn
 import typing
 
@@ -118,13 +119,16 @@ def run(args):
 
     results = list()
     for hyperparameter in config_space.get_hyperparameters():
+        logging.info('Started with hyperparameter %s' % hyperparameter.name)
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
             continue
         config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0, args.resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
         for transform_name, transform_fn in transform_fns.items():
+            logging.info('- Transformer fn %s' % transform_name)
             for alpha_value in np.geomspace(0.01, 2, 10):
+                logging.info('--- Alpha value %f' % alpha_value)
                 for meta_feature in quality_frame.columns.values:
                     try:
                         best_config, best_avg = select_best_configuration_across_tasks(
@@ -145,9 +149,19 @@ def run(args):
                                 'alpha_value': alpha_value,
                                 'meta_feature': meta_feature
                             }
-                            print(current_result)
+                            results.append(current_result)
+                            logging.info('Found improvement over base-line: %s' % current_result)
                     except ZeroDivisionError:
+                        logging.warning('Zero division error, skipping. ')
                         pass
+    total = {
+        'baseline_configuration': best_config_vanilla,
+        'baseline_avg_performance': best_avg_vanilla,
+        'outperforming': results
+    }
+
+    with open(os.path.join(args.output_directory, 'results.pkl'), 'w'):
+        pickle.dump(total, 0)
 
 
 if __name__ == '__main__':
