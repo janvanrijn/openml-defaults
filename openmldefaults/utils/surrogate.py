@@ -1,4 +1,5 @@
 import ConfigSpace
+import logging
 import math
 import numpy as np
 import openmlcontrib
@@ -136,7 +137,7 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
 
     y = setup_data[evaluation_measure].values
     del setup_data[evaluation_measure]
-    print(openmldefaults.utils.get_time(), 'Dimensions of meta-data task %d: %s' % (task_id, str(setup_data.shape)))
+    logging.info('Dimensions of meta-data task %d: %s' % (task_id, str(setup_data.shape)))
 
     # TODO: HPO
     surrogate = sklearn.pipeline.Pipeline(steps=[
