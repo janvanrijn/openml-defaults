@@ -7,6 +7,20 @@ import openmldefaults
 from typing import Dict
 
 
+def remove_hyperparameter(config_space: ConfigSpace.ConfigurationSpace,
+                          hyperparameter_name: str) -> ConfigSpace.ConfigurationSpace:
+    config_space_prime = ConfigSpace.ConfigurationSpace(meta=config_space.meta)
+    for hyperparameter in config_space.get_hyperparameters():
+        if hyperparameter.name != hyperparameter_name:
+            config_space_prime.add_hyperparameter(hyperparameter)
+    for condition in config_space.get_conditions():
+        if condition.parent.name != hyperparameter_name and condition.child.name != hyperparameter_name:
+            config_space_prime.add_condition(condition)
+        else:
+            raise ValueError()
+    return config_space_prime
+
+
 def get_search_space(search_space, type):
     name = 'get_' + search_space + '_' + type + '_search_space'
     return getattr(openmldefaults.config_spaces, name)()
@@ -51,15 +65,3 @@ def dict_to_prefixed_dict(hyperparameter_value, config_space):
         result[prefix_hyperparameter_name(param)] = value
     return result
 
-
-def check_in_configuration(config_space: ConfigSpace.ConfigurationSpace, param_values: Dict, allow_inactive_with_values: bool):
-    """
-    should be removed asap
-    """
-    param_values = dict(param_values)
-
-    for name in param_values.keys():
-        if openmlcontrib.legacy.interpret_hyperparameter_as_string(config_space.get_hyperparameter(name)):
-            param_values[name] = str(param_values[name])
-    ConfigSpace.Configuration(config_space, param_values,
-                              allow_inactive_with_values=allow_inactive_with_values)

@@ -1,4 +1,5 @@
 import ConfigSpace
+import math
 import numpy as np
 import openmlcontrib
 import openmldefaults
@@ -110,6 +111,7 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
     """
     nominal_values_min = 10
     # obtain the data
+    scaler = sklearn.preprocessing.MinMaxScaler()
     setup_data = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
                                                                        flow_id=flow_id,
                                                                        num_runs=num_runs,
@@ -117,6 +119,12 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
                                                                        configuration_space=config_space,
                                                                        evaluation_measures=[evaluation_measure],
                                                                        cache_directory=cache_directory)
+    # sort columns!
+    setup_data.sort_index(axis=1, inplace=True)
+    setup_data[evaluation_measure] = scaler.fit_transform(setup_data[evaluation_measure])
+    assert (math.isclose(min(setup_data[evaluation_measure]), 0.0), 'Not close to 0.0: %f' % min(setup_data[evaluation_measure]))
+    assert (math.isclose(max(setup_data[evaluation_measure]), 1.0), 'Not close to 1.0: %f' % max(setup_data[evaluation_measure]))
+
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
         if isinstance(hyperparameter, ConfigSpace.CategoricalHyperparameter):
