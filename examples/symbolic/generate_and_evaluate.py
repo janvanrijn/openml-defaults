@@ -51,7 +51,7 @@ def single_prediction(df: pd.DataFrame,
                       config: typing.Dict) -> float:
     # TODO: might break with categoricals
     df = pd.DataFrame(columns=df.columns.values)
-    df = df.append(config)
+    df = df.append(config, ignore_index=True) # TODO: ignore true ?
     return surrogate.predict(pd.get_dummies(df).as_matrix())[0]
 
 
@@ -97,18 +97,18 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         del surrogates[hold_out_task]
 
     # performance untransformed
-    best_config_vanilla, best_results_vanilla = select_best_configuration_across_tasks(
+    baseline_configuration, baseline_results_per_task = select_best_configuration_across_tasks(
         config_frame_orig, surrogates, config_frame_orig.columns.values, None, None, None, None)
-    best_avg_vanilla = np.average(best_results_vanilla)
-    best_hold_out_task = None
+    baseline_avg_performance = np.average(baseline_results_per_task)
+    baseline_holdout = None
     if hold_out_task is not None:
-        best_hold_out_task = single_prediction(config_frame_orig,
+        baseline_holdout = single_prediction(config_frame_orig,
                                                hold_out_surrogate,
-                                               best_config_vanilla)
-    logging.info('Baseline: %s [%s] %s. Holdout task: %s' % (best_config_vanilla,
-                                                             best_results_vanilla,
-                                                             best_avg_vanilla,
-                                                             best_hold_out_task))
+                                               baseline_configuration)
+    logging.info('Baseline: %s [%s] %s. Holdout task: %s' % (baseline_configuration,
+                                                             baseline_results_per_task,
+                                                             baseline_avg_performance,
+                                                             baseline_holdout))
 
     transform_fns = {
         'inverse_transform_fn': inverse_transform_fn,
@@ -116,7 +116,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         'multiply_transform_fn': multiply_transform_fn
     }
 
-    results = list()
+    symbolic_defaults = list()
     for hyperparameter in config_space.get_hyperparameters():
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
             continue
@@ -131,7 +131,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                 logging.info('--- Alpha value %f' % alpha_value)
                 for meta_feature in quality_frame.columns.values:
                     try:
-                        best_config_current, best_results_current = select_best_configuration_across_tasks(
+                        symbolic_config, symbolic_results_per_task = select_best_configuration_across_tasks(
                             config_frame_prime,
                             surrogates,
                             config_frame_orig.columns.values,  # note to take the original frame
@@ -140,26 +140,26 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                             alpha_value,
                             quality_frame[meta_feature].to_dict(),
                         )
-                        best_avg_current = np.average(best_results_current)
-                        if best_avg_current > best_avg_vanilla:
-                            holdout_score_current = None
+                        symbolic_average_performance = np.average(symbolic_results_per_task)
+                        if symbolic_average_performance > baseline_avg_performance:
+                            symbolic_holdout_score = None
                             if hold_out_surrogate is not None:
                                 symbolic_value = transform_fn(alpha_value, quality_frame[meta_feature][hold_out_task])
-                                best_config_current[hyperparameter.name] = symbolic_value
-                                holdout_score_current = single_prediction(config_frame_orig,
+                                symbolic_config[hyperparameter.name] = symbolic_value
+                                symbolic_holdout_score = single_prediction(config_frame_orig,
                                                                           hold_out_surrogate,
-                                                                          best_config_current)
+                                                                          symbolic_config)
                             current_result = {
-                                'config': best_config_current,
-                                'results': best_results_current,
-                                'avg_score': best_avg_current,
-                                'hyperparameter': hyperparameter.name,
+                                'configuration': symbolic_config,
+                                'results_per_task': symbolic_results_per_task,
+                                'avg_performance': symbolic_average_performance,
+                                'holdout_score': symbolic_holdout_score,
+                                'trasnform_hyperparameter': hyperparameter.name,
                                 'transform_fn': transform_name,
-                                'alpha_value': alpha_value,
-                                'meta_feature': meta_feature,
-                                'holdout_score': holdout_score_current,
+                                'transform_alpha_value': alpha_value,
+                                'transform_meta_feature': meta_feature,
                             }
-                            results.append(current_result)
+                            symbolic_defaults.append(current_result)
                             logging.info('Found improvement over base-line: %s' % current_result)
                     except ZeroDivisionError:
                         logging.warning('Zero division error with (fn=%s, alpha=%s, meta_f=%s). '
@@ -175,9 +175,11 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                                         'skipping. ' % (transform_name, alpha_value, meta_feature))
                         pass
     total = {
-        'baseline_configuration': best_config_vanilla,
-        'baseline_avg_performance': best_avg_vanilla,
-        'outperforming': results
+        'baseline_configuration': baseline_configuration,
+        'baseline_avg_performance': baseline_avg_performance,
+        'baseline_results_per_task': baseline_results_per_task,
+        'baseline_holdout_score': baseline_holdout,
+        'symbolic_defaults': symbolic_defaults
     }
     with open(output_file, 'wb') as fp:
         pickle.dump(obj=total, file=fp, protocol=0)
@@ -213,6 +215,14 @@ def run(args):
         surrogates[task_id] = estimator
 
     os.makedirs(args.output_directory, exist_ok=True)
+    output_file = os.path.join(args.output_directory, 'results_all.pkl')
+    run_on_tasks(config_frame_orig=config_frame_orig,
+                 surrogates=surrogates,
+                 quality_frame=quality_frame,
+                 config_space=config_space,
+                 resized_grid_size=args.resized_grid_size,
+                 hold_out_task=None,
+                 output_file=output_file)
     for task_id in study.tasks:
         output_file = os.path.join(args.output_directory, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
