@@ -1,6 +1,6 @@
 import argparse
 import ConfigSpace
-import copy
+import json
 import logging
 import numpy as np
 import openml
@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
+    parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--classifier', type=str, default='libsvm_svc', help='scikit-learn flow name')
     parser.add_argument('--config_space', type=str, default='micro', help='config space type')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -44,6 +45,18 @@ def power_transform_fn(param_value: float, meta_feature_value: float) -> float:
 
 def multiply_transform_fn(param_value: float, meta_feature_value: float) -> float:
     return param_value * meta_feature_value
+
+
+# def sigmoid_transform_fn(param_value: float, meta_feature_value: float) -> float:
+#     return 1 / (1 + np.e ** (-1 * meta_feature_value))
+
+
+def log_transform_fn(param_value: float, meta_feature_value: float) -> float:
+    return param_value * np.log(meta_feature_value)
+
+
+def root_transform_fn(param_value: float, meta_feature_value: float) -> float:
+    return param_value * np.sqrt(meta_feature_value)
 
 
 def single_prediction(df: pd.DataFrame,
@@ -113,7 +126,9 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     transform_fns = {
         'inverse_transform_fn': inverse_transform_fn,
         'power_transform_fn': power_transform_fn,
-        'multiply_transform_fn': multiply_transform_fn
+        'multiply_transform_fn': multiply_transform_fn,
+        'log_transform_fn': log_transform_fn,
+        'root_transform_fn': root_transform_fn
     }
 
     symbolic_defaults = list()
@@ -127,7 +142,9 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         config_frame_prime = pd.DataFrame(configurations)
         for transform_name, transform_fn in transform_fns.items():
             logging.info('- Transformer fn %s' % transform_name)
-            for alpha_value in np.geomspace(0.01, 2, 10):
+            geom_space = np.geomspace(0.01, 2, 10)
+            geom_space = np.append(geom_space, [1])
+            for alpha_value in geom_space:
                 logging.info('--- Alpha value %f' % alpha_value)
                 for meta_feature in quality_frame.columns.values:
                     try:
@@ -147,8 +164,8 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                                 symbolic_value = transform_fn(alpha_value, quality_frame[meta_feature][hold_out_task])
                                 symbolic_config[hyperparameter.name] = symbolic_value
                                 symbolic_holdout_score = single_prediction(config_frame_orig,
-                                                                          hold_out_surrogate,
-                                                                          symbolic_config)
+                                                                           hold_out_surrogate,
+                                                                           symbolic_config)
                             current_result = {
                                 'configuration': symbolic_config,
                                 'results_per_task': symbolic_results_per_task,
@@ -181,6 +198,8 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         'baseline_holdout_score': baseline_holdout,
         'symbolic_defaults': symbolic_defaults
     }
+    with open(output_file.replace('.pkl', '.json'), 'w') as fp:
+        json.dump(obj=total, fp=fp)
     with open(output_file, 'wb') as fp:
         pickle.dump(obj=total, file=fp, protocol=0)
 
@@ -216,14 +235,16 @@ def run(args):
 
     os.makedirs(args.output_directory, exist_ok=True)
     output_file = os.path.join(args.output_directory, 'results_all.pkl')
-    run_on_tasks(config_frame_orig=config_frame_orig,
-                 surrogates=surrogates,
-                 quality_frame=quality_frame,
-                 config_space=config_space,
-                 resized_grid_size=args.resized_grid_size,
-                 hold_out_task=None,
-                 output_file=output_file)
-    for task_id in study.tasks:
+    if args.task_idx is None:
+        run_on_tasks(config_frame_orig=config_frame_orig,
+                     surrogates=surrogates,
+                     quality_frame=quality_frame,
+                     config_space=config_space,
+                     resized_grid_size=args.resized_grid_size,
+                     hold_out_task=None,
+                     output_file=output_file)
+    else:
+        task_id = study.tasks[args.task_idx]
         output_file = os.path.join(args.output_directory, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
