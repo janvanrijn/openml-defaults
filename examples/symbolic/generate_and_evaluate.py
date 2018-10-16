@@ -244,7 +244,7 @@ def run(args):
         surrogates[task_id] = estimator
 
     os.makedirs(args.output_directory, exist_ok=True)
-    output_file = os.path.join(args.output_directory, 'results_all.pkl')
+    output_file = os.path.join(args.output_directory, args.classifier, 'results_all.pkl')
     if args.task_idx is None:
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
@@ -255,7 +255,7 @@ def run(args):
                      output_file=output_file)
     else:
         task_id = study.tasks[args.task_idx]
-        output_file = os.path.join(args.output_directory, 'results_%d.pkl' % task_id)
+        output_file = os.path.join(args.output_directory, args.classifier, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
                      quality_frame=quality_frame,
