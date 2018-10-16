@@ -114,10 +114,14 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         config_frame_orig, surrogates, config_frame_orig.columns.values, None, None, None, None)
     baseline_avg_performance = np.average(baseline_results_per_task)
     baseline_holdout = None
+    baseline_random_search = None
     if hold_out_task is not None:
         baseline_holdout = single_prediction(config_frame_orig,
-                                               hold_out_surrogate,
-                                               baseline_configuration)
+                                             hold_out_surrogate,
+                                             baseline_configuration)
+        baseline_random_search = [single_prediction(config_frame_orig,
+                                                    hold_out_surrogate,
+                                                    config_space.sample_configuration(1).get_dictionary()) for i in range(50)]
     logging.info('Baseline: %s [%s] %s. Holdout task: %s' % (baseline_configuration,
                                                              baseline_results_per_task,
                                                              baseline_avg_performance,
@@ -194,6 +198,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     total = {
         'baseline_configuration': baseline_configuration,
         'baseline_avg_performance': baseline_avg_performance,
+        'baseline_random_search': baseline_random_search,
         'baseline_results_per_task': baseline_results_per_task,
         'baseline_holdout_score': baseline_holdout,
         'symbolic_defaults': symbolic_defaults
