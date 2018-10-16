@@ -246,6 +246,7 @@ def run(args):
     os.makedirs(args.output_directory, exist_ok=True)
     output_file = os.path.join(args.output_directory, args.classifier, 'results_all.pkl')
     if args.task_idx is None:
+        logging.info('Evaluating on train tasks')
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
                      quality_frame=quality_frame,
@@ -255,6 +256,7 @@ def run(args):
                      output_file=output_file)
     else:
         task_id = study.tasks[args.task_idx]
+        logging.info('Evaluating on holdout task %d' % task_id)
         output_file = os.path.join(args.output_directory, args.classifier, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
