@@ -145,6 +145,6 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
         ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64,
                                                               random_state=42))
     ])
-    surrogate.fit(pd.get_dummies(setup_data).as_matrix(), y)
+    surrogate.fit(pd.get_dummies(setup_data).values, y)
     # the column vector is good to return, as the get_dummies function might behave instable
     return surrogate, setup_data.columns.values

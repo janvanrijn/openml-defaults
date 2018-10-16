@@ -40,9 +40,9 @@ def get_random_forest_default_search_space():
 
 def get_random_forest_micro_search_space():
 
-    cs = ConfigSpace.ConfigurationSpace()
+    cs = ConfigSpace.ConfigurationSpace(meta={'flow_id': 6969})
 
-    n_estimators = ConfigSpace.Constant("n_estimators", 100)
+    n_estimators = ConfigSpace.Constant("classifier__n_estimators", 100)
     max_features = ConfigSpace.UniformFloatHyperparameter(
         "classifier__max_features", 0.001, 1., default_value=0.5)
     min_samples_split = ConfigSpace.UniformIntegerHyperparameter(

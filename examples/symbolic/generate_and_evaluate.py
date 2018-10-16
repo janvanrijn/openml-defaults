@@ -88,7 +88,7 @@ def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
         if not np.array_equal(transformed_frame.columns.values, surrogate_train_cols):
             raise ValueError('Column set not equal: %s vs %s' % (transformed_frame.columns.values,
                                                                  surrogate_train_cols))
-        results[idx] = task_surrogate.predict(pd.get_dummies(transformed_frame).as_matrix())
+        results[idx] = task_surrogate.predict(pd.get_dummies(transformed_frame).values)
     average_measure_per_configuration = np.average(results, axis=0)
     best_idx = np.argmax(average_measure_per_configuration)
     best_config = config_frame.iloc[best_idx]
@@ -137,11 +137,14 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
     symbolic_defaults = list()
     for hyperparameter in config_space.get_hyperparameters():
+        if isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
+            logging.info('Skipping Constant Hyperparameter: %s' % hyperparameter.name)
+            continue
+        if isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
+            logging.info('Skipping Unparameterized Hyperparameter: %s' % hyperparameter.name)
+            continue
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
-            continue
-        if not isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
-            continue
-        if not isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
+            logging.info('Skipping Non-Numerical Hyperparameter: %s' % hyperparameter.name)
             continue
         logging.info('Started with hyperparameter %s' % hyperparameter.name)
         config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
@@ -207,8 +210,6 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         'baseline_holdout_score': baseline_holdout,
         'symbolic_defaults': symbolic_defaults
     }
-    with open(output_file.replace('.pkl', '.json'), 'w') as fp:
-        json.dump(obj=total, fp=fp)
     with open(output_file, 'wb') as fp:
         pickle.dump(obj=total, file=fp, protocol=0)
 
