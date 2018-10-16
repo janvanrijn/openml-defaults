@@ -37,4 +37,19 @@ def get_random_forest_default_search_space():
                             bootstrap])
     return cs
 
-get_random_forest_default_search_space()
+
+def get_random_forest_micro_search_space():
+
+    cs = ConfigSpace.ConfigurationSpace()
+
+    n_estimators = ConfigSpace.Constant("n_estimators", 100)
+    max_features = ConfigSpace.UniformFloatHyperparameter(
+        "classifier__max_features", 0.001, 1., default_value=0.5)
+    min_samples_split = ConfigSpace.UniformIntegerHyperparameter(
+        "classifier__min_samples_split", 2, 20, default_value=2)
+    min_samples_leaf = ConfigSpace.UniformIntegerHyperparameter(
+        "classifier__min_samples_leaf", 1, 20, default_value=1)
+
+    cs.add_hyperparameters([n_estimators, max_features,
+                            min_samples_split, min_samples_leaf])
+    return cs

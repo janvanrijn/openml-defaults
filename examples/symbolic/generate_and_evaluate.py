@@ -139,6 +139,10 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     for hyperparameter in config_space.get_hyperparameters():
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
             continue
+        if not isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
+            continue
+        if not isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
+            continue
         logging.info('Started with hyperparameter %s' % hyperparameter.name)
         config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0,
