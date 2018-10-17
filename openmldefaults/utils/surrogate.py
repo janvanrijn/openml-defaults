@@ -102,10 +102,10 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
         return result
 
 
-def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
+def train_surrogate_on_task(task_id: int,
                             config_space: ConfigSpace.ConfigurationSpace,
-                            evaluation_measure: str,
-                            cache_directory: str) \
+                            setup_data: pd.DataFrame,
+                            evaluation_measure: str) \
         -> typing.Tuple[sklearn.pipeline.Pipeline, typing.List]:
     """
     Trains a surrogate on the meta-data from a task
@@ -113,13 +113,7 @@ def train_surrogate_on_task(task_id: int, flow_id: int, num_runs: int,
     nominal_values_min = 10
     # obtain the data
     scaler = sklearn.preprocessing.MinMaxScaler()
-    setup_data = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
-                                                                       flow_id=flow_id,
-                                                                       num_runs=num_runs,
-                                                                       raise_few_runs=False,
-                                                                       configuration_space=config_space,
-                                                                       evaluation_measures=[evaluation_measure],
-                                                                       cache_directory=cache_directory)
+
     # sort columns!
     setup_data.sort_index(axis=1, inplace=True)
     setup_data[evaluation_measure] = scaler.fit_transform(setup_data[evaluation_measure])

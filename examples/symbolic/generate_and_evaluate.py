@@ -236,8 +236,16 @@ def run(args):
     surrogates = dict()
     for idx, task_id in enumerate(study.tasks):
         logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(study.tasks)))
+        setup_frame = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
+                                                                            flow_id=config_space.meta['flow_id'],
+                                                                            num_runs=args.num_runs,
+                                                                            raise_few_runs=False,
+                                                                            configuration_space=config_space,
+                                                                            evaluation_measures=[args.scoring],
+                                                                            cache_directory=args.cache_directory)
+
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
-            task_id, config_space.meta['flow_id'], args.num_runs, config_space, args.scoring, args.cache_directory)
+            task_id, config_space, setup_frame, args.scoring)
         if not np.array_equal(config_frame_orig.columns.values, columns):
             # if this goes wrong, it is due to the pd.get_dummies() fn
             raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
