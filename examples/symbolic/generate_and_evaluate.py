@@ -285,6 +285,10 @@ def run(args):
             setup_frame = metadata_frame.loc[metadata_frame['task_id'] == task_id]
             del setup_frame['task_id']
             logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
+        if len(getattr(setup_frame, args.scoring).unique) == 1:
+            logging.warning('Not enough unique performance measures for task %d. Skipping' % task_id)
+            continue
+
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
             task_id, config_space, setup_frame, args.scoring)
         if not np.array_equal(config_frame_orig.columns.values, columns):
