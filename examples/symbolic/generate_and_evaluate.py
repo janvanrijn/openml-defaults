@@ -1,6 +1,6 @@
+import arff
 import argparse
 import ConfigSpace
-import json
 import logging
 import numpy as np
 import openml
@@ -21,6 +21,7 @@ def parse_args():
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=None)
+    parser.add_argument('--metadata_file', type=str, default='/home/jan/projects/openml-pimp/KDD2018/data/arff/libsvm_svc.arff')
     parser.add_argument('--classifier', type=str, default='libsvm_svc', help='scikit-learn flow name')
     parser.add_argument('--config_space', type=str, default='micro', help='config space type')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -233,17 +234,57 @@ def run(args):
     config_frame_orig.sort_index(axis=1, inplace=True)
     quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, False, -1, True)
 
+    metadata_frame = None
+    if args.metadata_file is not None:
+        with open(args.metadata_file, 'r') as fp:
+            metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
+            if metadata_atts['flow_id'] != config_space.meta['flow_id']:
+                raise ValueError('Flow ids do not match: %d vs %d' % (metadata_atts['flow_id'],
+                                                                      config_space.meta['flow_id']))
+
+            if args.scoring not in metadata_atts['measure']:
+                raise ValueError('Could not find measure: %s' % args.scoring)
+
+            metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp))
+            metadata_frame[args.scoring] = metadata_frame['y']
+            legal_column_names = config_space.get_hyperparameter_names() + [args.scoring] + ['task_id']
+
+            # TODO modularize
+            logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
+            for column_name in metadata_frame.columns.values:
+                if column_name not in legal_column_names:
+                    del metadata_frame[column_name]
+
+            to_drop_indices = []
+            for row_idx in metadata_frame.index.values:
+                config = metadata_frame.iloc[row_idx].to_dict()
+                del config['task_id']
+                del config[args.scoring]
+                # print(config)
+                try:
+                    ConfigSpace.Configuration(config_space, config)
+                except ValueError:
+                    # print('dropping')
+                    to_drop_indices.append(row_idx)
+            metadata_frame = metadata_frame.drop(to_drop_indices)
+            logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
+
     surrogates = dict()
     for idx, task_id in enumerate(study.tasks):
         logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(study.tasks)))
-        setup_frame = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
-                                                                            flow_id=config_space.meta['flow_id'],
-                                                                            num_runs=args.num_runs,
-                                                                            raise_few_runs=False,
-                                                                            configuration_space=config_space,
-                                                                            evaluation_measures=[args.scoring],
-                                                                            cache_directory=args.cache_directory)
-
+        if metadata_frame is None:
+            setup_frame = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
+                                                                                flow_id=config_space.meta['flow_id'],
+                                                                                num_runs=args.num_runs,
+                                                                                raise_few_runs=False,
+                                                                                configuration_space=config_space,
+                                                                                evaluation_measures=[args.scoring],
+                                                                                cache_directory=args.cache_directory)
+            logging.info('obtained meta-data from OpenML. Dimensions: %s' % str(setup_frame.shape))
+        else:
+            setup_frame = metadata_frame.loc[metadata_frame['task_id'] == task_id]
+            del setup_frame['task_id']
+            logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
             task_id, config_space, setup_frame, args.scoring)
         if not np.array_equal(config_frame_orig.columns.values, columns):

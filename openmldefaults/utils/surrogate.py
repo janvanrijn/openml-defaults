@@ -116,9 +116,10 @@ def train_surrogate_on_task(task_id: int,
 
     # sort columns!
     setup_data.sort_index(axis=1, inplace=True)
-    setup_data[evaluation_measure] = scaler.fit_transform(setup_data[evaluation_measure])
-    assert (math.isclose(min(setup_data[evaluation_measure]), 0.0), 'Not close to 0.0: %f' % min(setup_data[evaluation_measure]))
-    assert (math.isclose(max(setup_data[evaluation_measure]), 1.0), 'Not close to 1.0: %f' % max(setup_data[evaluation_measure]))
+    setup_data.loc[:, evaluation_measure] = scaler.fit_transform(setup_data[evaluation_measure])
+
+    assert math.isclose(min(setup_data[evaluation_measure]), 0.0), 'Not close to 0.0: %f' % min(setup_data[evaluation_measure])
+    assert math.isclose(max(setup_data[evaluation_measure]), 1.0), 'Not close to 1.0: %f' % max(setup_data[evaluation_measure])
 
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
