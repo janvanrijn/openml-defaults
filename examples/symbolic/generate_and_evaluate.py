@@ -285,7 +285,7 @@ def run(args):
             setup_frame = metadata_frame.loc[metadata_frame['task_id'] == task_id]
             del setup_frame['task_id']
             logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
-        if len(getattr(setup_frame, args.scoring).unique) == 1:
+        if len(getattr(setup_frame, args.scoring).unique()) == 1:
             logging.warning('Not enough unique performance measures for task %d. Skipping' % task_id)
             continue
 
