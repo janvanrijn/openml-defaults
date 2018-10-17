@@ -65,7 +65,7 @@ def single_prediction(df: pd.DataFrame,
     # TODO: might break with categoricals
     df = pd.DataFrame(columns=df.columns.values)
     df = df.append(config, ignore_index=True) # TODO: ignore true ?
-    return surrogate.predict(pd.get_dummies(df).as_matrix())[0]
+    return surrogate.predict(pd.get_dummies(df).values)[0]
 
 
 def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
@@ -256,7 +256,8 @@ def run(args):
                      output_file=output_file)
     else:
         task_id = study.tasks[args.task_idx]
-        logging.info('Evaluating on holdout task %d' % task_id)
+        logging.info('Evaluating on holdout task %d (%d/%d)' %
+                     (task_id, args.task_idx + 1, len(study.tasks)))
         output_file = os.path.join(args.output_directory, args.classifier, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
