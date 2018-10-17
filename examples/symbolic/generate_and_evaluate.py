@@ -296,7 +296,7 @@ def run(args):
             raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
         surrogates[task_id] = estimator
 
-    os.makedirs(args.output_directory, exist_ok=True)
+    os.makedirs(os.path.join(args.output_directory, args.classifier), exist_ok=True)
     output_file = os.path.join(args.output_directory, args.classifier, 'results_all.pkl')
     if args.task_idx is None:
         logging.info('Evaluating on train tasks')
