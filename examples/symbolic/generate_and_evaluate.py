@@ -66,7 +66,8 @@ def single_prediction(df: pd.DataFrame,
     # TODO: might break with categoricals
     df = pd.DataFrame(columns=df.columns.values)
     df = df.append(config, ignore_index=True) # TODO: ignore true ?
-    return surrogate.predict(pd.get_dummies(df).values)[0]
+    # TODO: use dummies?
+    return surrogate.predict(df.values)[0]
 
 
 def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
@@ -245,7 +246,7 @@ def run(args):
             if args.scoring not in metadata_atts['measure']:
                 raise ValueError('Could not find measure: %s' % args.scoring)
 
-            metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp))
+            metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
             metadata_frame[args.scoring] = metadata_frame['y']
             legal_column_names = config_space.get_hyperparameter_names() + [args.scoring] + ['task_id']
 
@@ -260,13 +261,14 @@ def run(args):
                 config = metadata_frame.iloc[row_idx].to_dict()
                 del config['task_id']
                 del config[args.scoring]
-                # print(config)
                 try:
                     ConfigSpace.Configuration(config_space, config)
                 except ValueError:
                     # print('dropping')
                     to_drop_indices.append(row_idx)
             metadata_frame = metadata_frame.drop(to_drop_indices)
+            if metadata_frame.shape[0] == 0:
+                raise ValueError()
             logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
 
     surrogates = dict()
@@ -288,7 +290,8 @@ def run(args):
         if len(getattr(setup_frame, args.scoring).unique()) == 1:
             logging.warning('Not enough unique performance measures for task %d. Skipping' % task_id)
             continue
-
+        if setup_frame.shape[0] == 0:
+            raise ValueError()
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
             task_id, config_space, setup_frame, args.scoring)
         if not np.array_equal(config_frame_orig.columns.values, columns):
