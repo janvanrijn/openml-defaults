@@ -293,6 +293,7 @@ def run(args):
             continue
         if setup_frame.shape[0] == 0:
             logging.warning('No results for task %d. Skipping' % task_id)
+            continue
 
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
             task_id, config_space, setup_frame, args.scoring)
