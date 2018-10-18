@@ -1,4 +1,5 @@
 import argparse
+import math
 import openml
 import os
 import pandas as pd
@@ -17,7 +18,7 @@ def parse_args():
 
 
 def get_task_names(tag):
-    results = openml.tasks.list_tasks(tag=tag)
+    results = openml.tasks.list_tasks(tag=tag, status='all')
     records = []
     for result in results.values():
         records.append({'task_idx': int(result['tid']), 'dataset': result['name']})
@@ -54,26 +55,33 @@ def is_legal_feature(meta_feature):
 
 def formula_str(result):
     hyperparameter = result['trasnform_hyperparameter'].split('__')[-1]
+    other_params = dict(result['configuration'])
+    del other_params[result['trasnform_hyperparameter']]
     if result['transform_fn'] == 'inverse_transform_fn':
-        return '%s = %f / %s ' % (hyperparameter,
-                                  result['transform_alpha_value'],
-                                  result['transform_meta_feature'])
+        return '%s = %f / %s, %s ' % (hyperparameter,
+                                      result['transform_alpha_value'],
+                                      result['transform_meta_feature'],
+                                      other_params)
     elif result['transform_fn'] == 'power_transform_fn':
-        return '%s = %f^{%s} ' % (hyperparameter,
-                                  result['transform_alpha_value'],
-                                  result['transform_meta_feature'])
+        return '%s = %f^{%s}, %s ' % (hyperparameter,
+                                      result['transform_alpha_value'],
+                                      result['transform_meta_feature'],
+                                      other_params)
     elif result['transform_fn'] == 'multiply_transform_fn':
-        return '%s = %f \\cdot %s ' % (hyperparameter,
-                                       result['transform_alpha_value'],
-                                       result['transform_meta_feature'])
+        return '%s = %f \\cdot %s, %s ' % (hyperparameter,
+                                           result['transform_alpha_value'],
+                                           result['transform_meta_feature'],
+                                           other_params)
     elif result['transform_fn'] == 'log_transform_fn':
-        return '%s = %f \\cdot \\log %s ' % (hyperparameter,
-                                             result['transform_alpha_value'],
-                                             result['transform_meta_feature'])
+        return '%s = %f \\cdot \\log %s, %s ' % (hyperparameter,
+                                                 result['transform_alpha_value'],
+                                                 result['transform_meta_feature'],
+                                                 other_params)
     elif result['transform_fn'] == 'root_transform_fn':
-        return '%s = %f \\cdot \\sqrt{%s} ' % (hyperparameter,
-                                               result['transform_alpha_value'],
-                                               result['transform_meta_feature'])
+        return '%s = %f \\cdot \\sqrt{%s}, %s ' % (hyperparameter,
+                                                   result['transform_alpha_value'],
+                                                   result['transform_meta_feature'],
+                                                   other_params)
     else:
         raise ValueError()
 
@@ -83,6 +91,7 @@ def get_results_train(directory):
         results = pickle.load(fp)
 
     baseline_result = results['baseline_results_per_task']
+    baseline_config = results['baseline_configuration']
     best_avg_score = results['baseline_avg_performance']
     best_result = None
     best_meta_formula = None
@@ -97,7 +106,7 @@ def get_results_train(directory):
     data = []
     for idx in range(len(best_result)):
         data.append({'defaults_type': 'symbolic', 'task_idx': idx, 'evaluation': best_result[idx], 'formula': best_meta_formula})
-        data.append({'defaults_type': 'vanilla', 'task_idx': idx, 'evaluation': baseline_result[idx]})
+        data.append({'defaults_type': 'vanilla', 'task_idx': idx, 'evaluation': baseline_result[idx], 'formula': baseline_config})
 
     df = pd.DataFrame(data=data)
     return df
@@ -113,6 +122,7 @@ def get_results_holdout(directory):
         task_id = file.split('.')[0].split('_')[1]
 
         baseline_holdout = results['baseline_holdout_score']
+        baseline_config = results['baseline_configuration']
         best_avg_score = results['baseline_avg_performance']
         best_holdout = None
         best_meta_formula = None
@@ -125,7 +135,7 @@ def get_results_holdout(directory):
                 best_meta_formula = formula_str(result)
 
         data.append({'defaults_type': 'symbolic', 'task_idx': int(task_id), 'evaluation': best_holdout, 'formula': best_meta_formula})
-        data.append({'defaults_type': 'vanilla', 'task_idx': int(task_id), 'evaluation': baseline_holdout})
+        data.append({'defaults_type': 'vanilla', 'task_idx': int(task_id), 'evaluation': baseline_holdout, 'formula': baseline_config})
 
     df = pd.DataFrame(data=data)
     return df
