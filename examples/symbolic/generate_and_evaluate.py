@@ -1,8 +1,6 @@
-import arff
 import argparse
 import ConfigSpace
 import logging
-import math
 import numpy as np
 import openml
 import openmlcontrib
@@ -18,8 +16,6 @@ import typing
 def parse_args():
     metadata_file = '/home/janvanrijn/experiments/sklearn-bot/results/results__500__svc__predictive_accuracy.arff'
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
-    parser.add_argument('--cache_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml_cache',
-                        help='directory to store cache')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
@@ -199,35 +195,7 @@ def run(args):
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
     if args.scoring not in metadata_atts['measure']:
         raise ValueError('Could not find measure: %s' % args.scoring)
-    with open(args.metadata_file, 'r') as fp:
-        metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
-
-    # TODO: modularize. Remove unnecessary columns
-    legal_column_names = config_space.get_hyperparameter_names() + [args.scoring] + ['task_id']
-    logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
-    for column_name in metadata_frame.columns.values:
-        if column_name not in legal_column_names:
-            logging.info('Removing column: %s' % column_name)
-            del metadata_frame[column_name]
-
-    # TODO: modularize. Remove unnecessary rows
-    to_drop_indices = []
-    for row_idx, row in metadata_frame.iterrows():
-        # conditionals can be nan. filter these out with notnull()
-        config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
-        del config['task_id']
-        del config[args.scoring]
-
-        try:
-            ConfigSpace.Configuration(config_space, config)
-        except ValueError as e:
-            logging.info('Dropping config, %s' % e)
-            to_drop_indices.append(row_idx)
-
-    metadata_frame = metadata_frame.drop(to_drop_indices)
-    if metadata_frame.shape[0] == 0:
-        raise ValueError()
-    logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
+    metadata_frame = openmldefaults.utils.metadata_file_to_frame(args.metadata_file, config_space, args.scoring)
 
     surrogates = dict()
     for idx, task_id in enumerate(study.tasks):

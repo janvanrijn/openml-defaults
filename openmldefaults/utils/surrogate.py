@@ -1,9 +1,9 @@
+import arff
 import ConfigSpace
 import logging
 import math
 import numpy as np
 import openmlcontrib
-import openmldefaults
 import pandas as pd
 import sklearn
 import typing
@@ -161,3 +161,40 @@ def train_surrogate_on_task(task_id: int,
     surrogate.fit(setup_data.values, y)
     # the column vector is good to return, as the get_dummies function might behave in-stable
     return surrogate, setup_data.columns.values
+
+
+def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.ConfigurationSpace, scoring: str) -> pd.DataFrame:
+    """
+    Loads a meta-data set, as outputted by sklearn bot, and removes redundent
+    columns and rows
+    """
+    with open(metadata_file, 'r') as fp:
+        metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
+
+    # TODO: modularize. Remove unnecessary columns
+    legal_column_names = config_space.get_hyperparameter_names() + [scoring] + ['task_id']
+    logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
+    for column_name in metadata_frame.columns.values:
+        if column_name not in legal_column_names:
+            logging.info('Removing column: %s' % column_name)
+            del metadata_frame[column_name]
+
+    # TODO: modularize. Remove unnecessary rows
+    to_drop_indices = []
+    for row_idx, row in metadata_frame.iterrows():
+        # conditionals can be nan. filter these out with notnull()
+        config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
+        del config['task_id']
+        del config[scoring]
+
+        try:
+            ConfigSpace.Configuration(config_space, config)
+        except ValueError as e:
+            logging.info('Dropping config, %s' % e)
+            to_drop_indices.append(row_idx)
+
+    metadata_frame = metadata_frame.drop(to_drop_indices)
+    if metadata_frame.shape[0] == 0:
+        raise ValueError()
+    logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
+    return metadata_frame
