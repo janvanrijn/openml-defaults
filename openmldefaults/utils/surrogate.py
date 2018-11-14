@@ -90,9 +90,7 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
             elif len(parent_conditions) == 1:
                 condition_values = parent_conditions[0].value if isinstance(parent_conditions[0].value, list) \
                     else [parent_conditions[0].value]
-                condition_values_processed = [openmldefaults.config_spaces.post_process(value)
-                                              for value in condition_values]
-                if recursive_config[parent_conditions[0].parent.name] in condition_values_processed:
+                if recursive_config[parent_conditions[0].parent.name] in condition_values:
                     result.extend(copy_recursive_configs(recursive_config, current_hyperparameter.name, current_values))
                 else:
                     result.extend(copy_recursive_configs(recursive_config, current_hyperparameter.name, [np.nan]))
@@ -105,10 +103,12 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
 def train_surrogate_on_task(task_id: int,
                             config_space: ConfigSpace.ConfigurationSpace,
                             setup_data: pd.DataFrame,
-                            evaluation_measure: str) \
+                            evaluation_measure: str,
+                            n_estimators,
+                            random_seed) \
         -> typing.Tuple[sklearn.pipeline.Pipeline, typing.List]:
     """
-    Trains a surrogate on the meta-data from a task
+    Trains a surrogate on the meta-data from a task.
     """
     nominal_values_min = 10
     # obtain the data
@@ -116,10 +116,14 @@ def train_surrogate_on_task(task_id: int,
 
     # sort columns!
     setup_data.sort_index(axis=1, inplace=True)
-    setup_data.loc[:, evaluation_measure] = scaler.fit_transform(setup_data[evaluation_measure])
+    # reshape because of sklearn api (does not work on vectors)
+    y_reshaped = setup_data[evaluation_measure].values.reshape(-1, 1)
+    setup_data[evaluation_measure] = scaler.fit_transform(y_reshaped)[:, 0]
 
-    assert math.isclose(min(setup_data[evaluation_measure]), 0.0), 'Not close to 0.0: %f' % min(setup_data[evaluation_measure])
-    assert math.isclose(max(setup_data[evaluation_measure]), 1.0), 'Not close to 1.0: %f' % max(setup_data[evaluation_measure])
+    min_val = min(setup_data[evaluation_measure])
+    assert math.isclose(min_val, 0.0), 'Not close to 0.0: %f' % min_val
+    max_val = max(setup_data[evaluation_measure])
+    assert math.isclose(max_val, 1.0), 'Not close to 1.0: %f' % max_val
 
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
@@ -135,12 +139,25 @@ def train_surrogate_on_task(task_id: int,
     logging.info('Dimensions of meta-data task %d: %s' % (task_id, str(setup_data.shape)))
 
     # TODO: HPO
-    surrogate = sklearn.pipeline.Pipeline(steps=[
-        ('imputer', sklearn.preprocessing.Imputer(strategy='median')),
-        ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=64,
-                                                              random_state=42))
+    nominal_pipe = sklearn.pipeline.Pipeline(steps=[
+        ('imputer', sklearn.impute.SimpleImputer(strategy='constant', fill_value=-1)),
+        ('encoder', sklearn.preprocessing.OneHotEncoder())
     ])
-    # TODO: use dummies?
+
+    nominal_indicators = []
+    for idx, (name, col) in enumerate(setup_data.dtypes.iteritems()):
+        nominal_indicators.append(col == object)
+    nominal_indicators = np.array(nominal_indicators, dtype=bool)
+    col_trans = sklearn.compose.ColumnTransformer(transformers=[
+        ('numeric', sklearn.impute.SimpleImputer(strategy='median'), ~nominal_indicators),
+        ('nominal', nominal_pipe, nominal_indicators)
+    ])
+
+    surrogate = sklearn.pipeline.Pipeline(steps=[
+        ('transformer', col_trans),
+        ('classifier', sklearn.ensemble.RandomForestRegressor(n_estimators=n_estimators,
+                                                              random_state=random_seed))
+    ])
     surrogate.fit(setup_data.values, y)
-    # the column vector is good to return, as the get_dummies function might behave instable
+    # the column vector is good to return, as the get_dummies function might behave in-stable
     return surrogate, setup_data.columns.values

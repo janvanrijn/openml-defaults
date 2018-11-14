@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 
 def selected_set(df: pd.DataFrame, defaults: List[Tuple], column_slice: List=None):

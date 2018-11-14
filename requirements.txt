@@ -1,12 +1,12 @@
-ConfigSpace==0.4.7
+ConfigSpace
 Cython
 feather-format
 liac-arff
 matplotlib
 numpy
-pandas
+pandas==0.24.0dev
 pulp
-scikit-learn==0.18.1
+scikit-learn
 scipy
 scikit-optimize
 seaborn

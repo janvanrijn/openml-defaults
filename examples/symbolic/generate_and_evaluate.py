@@ -2,6 +2,7 @@ import arff
 import argparse
 import ConfigSpace
 import logging
+import math
 import numpy as np
 import openml
 import openmlcontrib
@@ -10,10 +11,12 @@ import os
 import pandas as pd
 import pickle
 import sklearn
+import sklearnbot
 import typing
 
 
 def parse_args():
+    metadata_file = '/home/janvanrijn/experiments/sklearn-bot/results/results__500__svc__predictive_accuracy.arff'
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--cache_directory', type=str, default=os.path.expanduser('~') + '/experiments/openml_cache',
                         help='directory to store cache')
@@ -21,43 +24,12 @@ def parse_args():
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=None)
-    parser.add_argument('--metadata_file', type=str, default='/home/jan/projects/openml-pimp/KDD2018/data/arff/libsvm_svc.arff')
-    parser.add_argument('--classifier', type=str, default='libsvm_svc', help='scikit-learn flow name')
-    parser.add_argument('--config_space', type=str, default='micro', help='config space type')
+    parser.add_argument('--metadata_file', type=str, default=metadata_file)
+    parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
-    parser.add_argument('--num_runs', type=int, default=200, help='max runs to obtain from openml')
     parser.add_argument('--resized_grid_size', type=int, default=8)
+    parser.add_argument('--random_seed', type=int, default=42)
     return parser.parse_args()
-
-
-def inverse_transform_fn(param_value: float, meta_feature_value: float) -> float:
-    # raising is ok
-    if meta_feature_value == 0.0:
-        raise ZeroDivisionError()
-    result = param_value / meta_feature_value
-    if np.isinf(result):
-        raise OverflowError()
-    return result
-
-
-def power_transform_fn(param_value: float, meta_feature_value: float) -> float:
-    return param_value ** meta_feature_value
-
-
-def multiply_transform_fn(param_value: float, meta_feature_value: float) -> float:
-    return param_value * meta_feature_value
-
-
-# def sigmoid_transform_fn(param_value: float, meta_feature_value: float) -> float:
-#     return 1 / (1 + np.e ** (-1 * meta_feature_value))
-
-
-def log_transform_fn(param_value: float, meta_feature_value: float) -> float:
-    return param_value * np.log(meta_feature_value)
-
-
-def root_transform_fn(param_value: float, meta_feature_value: float) -> float:
-    return param_value * np.sqrt(meta_feature_value)
 
 
 def single_prediction(df: pd.DataFrame,
@@ -66,7 +38,6 @@ def single_prediction(df: pd.DataFrame,
     # TODO: might break with categoricals
     df = pd.DataFrame(columns=df.columns.values)
     df = df.append(config, ignore_index=True) # TODO: ignore true ?
-    # TODO: use dummies?
     return surrogate.predict(df.values)[0]
 
 
@@ -90,7 +61,7 @@ def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
         if not np.array_equal(transformed_frame.columns.values, surrogate_train_cols):
             raise ValueError('Column set not equal: %s vs %s' % (transformed_frame.columns.values,
                                                                  surrogate_train_cols))
-        results[idx] = task_surrogate.predict(pd.get_dummies(transformed_frame).values)
+        results[idx] = task_surrogate.predict(transformed_frame.values)
     average_measure_per_configuration = np.average(results, axis=0)
     best_idx = np.argmax(average_measure_per_configuration)
     best_config = config_frame.iloc[best_idx]
@@ -129,14 +100,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                                                              baseline_avg_performance,
                                                              baseline_holdout))
 
-    transform_fns = {
-        'inverse_transform_fn': inverse_transform_fn,
-        'power_transform_fn': power_transform_fn,
-        'multiply_transform_fn': multiply_transform_fn,
-        'log_transform_fn': log_transform_fn,
-        'root_transform_fn': root_transform_fn
-    }
-
+    transform_fns = openmldefaults.symbolic.all_transform_fns()
     symbolic_defaults = list()
     for hyperparameter in config_space.get_hyperparameters():
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
@@ -149,7 +113,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
             logging.info('Skipping Non-Numerical Hyperparameter: %s' % hyperparameter.name)
             continue
         logging.info('Started with hyperparameter %s' % hyperparameter.name)
-        config_space_prime = openmldefaults.config_spaces.remove_hyperparameter(config_space, hyperparameter.name)
+        config_space_prime = openmldefaults.utils.remove_hyperparameter(config_space, hyperparameter.name)
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0,
                                                                            resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
@@ -225,68 +189,53 @@ def run(args):
     if 34536 in study.tasks:
         study.tasks.remove(34536)
 
-    config_space_fn = getattr(openmldefaults.config_spaces,
-                              'get_%s_%s_search_space' % (args.classifier,
-                                                          args.config_space))
-    config_space = config_space_fn()
+    config_space = sklearnbot.config_spaces.get_config_space(args.classifier_name, args.random_seed)
     configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
 
     config_frame_orig = pd.DataFrame(configurations)
     config_frame_orig.sort_index(axis=1, inplace=True)
     quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, False, -1, True)
 
-    metadata_frame = None
-    if args.metadata_file is not None:
-        with open(args.metadata_file, 'r') as fp:
-            metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
-            if metadata_atts['flow_id'] != config_space.meta['flow_id']:
-                raise ValueError('Flow ids do not match: %d vs %d' % (metadata_atts['flow_id'],
-                                                                      config_space.meta['flow_id']))
+    metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
+    if args.scoring not in metadata_atts['measure']:
+        raise ValueError('Could not find measure: %s' % args.scoring)
+    with open(args.metadata_file, 'r') as fp:
+        metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
 
-            if args.scoring not in metadata_atts['measure']:
-                raise ValueError('Could not find measure: %s' % args.scoring)
+    # TODO: modularize. Remove unnecessary columns
+    legal_column_names = config_space.get_hyperparameter_names() + [args.scoring] + ['task_id']
+    logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
+    for column_name in metadata_frame.columns.values:
+        if column_name not in legal_column_names:
+            logging.info('Removing column: %s' % column_name)
+            del metadata_frame[column_name]
 
-            metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
-            metadata_frame[args.scoring] = metadata_frame['y']
-            legal_column_names = config_space.get_hyperparameter_names() + [args.scoring] + ['task_id']
+    # TODO: modularize. Remove unnecessary rows
+    to_drop_indices = []
+    for row_idx, row in metadata_frame.iterrows():
+        # conditionals can be nan. filter these out with notnull()
+        config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
+        del config['task_id']
+        del config[args.scoring]
 
-            # TODO modularize
-            logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
-            for column_name in metadata_frame.columns.values:
-                if column_name not in legal_column_names:
-                    del metadata_frame[column_name]
+        try:
+            ConfigSpace.Configuration(config_space, config)
+        except ValueError as e:
+            logging.info('Dropping config, %s' % e)
+            to_drop_indices.append(row_idx)
 
-            to_drop_indices = []
-            for row_idx in metadata_frame.index.values:
-                config = metadata_frame.iloc[row_idx].to_dict()
-                del config['task_id']
-                del config[args.scoring]
-                try:
-                    ConfigSpace.Configuration(config_space, config)
-                except ValueError:
-                    # print('dropping')
-                    to_drop_indices.append(row_idx)
-            metadata_frame = metadata_frame.drop(to_drop_indices)
-            if metadata_frame.shape[0] == 0:
-                raise ValueError()
-            logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
+    metadata_frame = metadata_frame.drop(to_drop_indices)
+    if metadata_frame.shape[0] == 0:
+        raise ValueError()
+    logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
 
     surrogates = dict()
     for idx, task_id in enumerate(study.tasks):
         logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(study.tasks)))
-        if metadata_frame is None:
-            setup_frame = openmlcontrib.meta.get_task_flow_results_as_dataframe(task_id=task_id,
-                                                                                flow_id=config_space.meta['flow_id'],
-                                                                                num_runs=args.num_runs,
-                                                                                raise_few_runs=False,
-                                                                                configuration_space=config_space,
-                                                                                evaluation_measures=[args.scoring],
-                                                                                cache_directory=args.cache_directory)
-            logging.info('obtained meta-data from OpenML. Dimensions: %s' % str(setup_frame.shape))
-        else:
-            setup_frame = metadata_frame.loc[metadata_frame['task_id'] == task_id]
-            del setup_frame['task_id']
-            logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
+
+        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
+        del setup_frame['task_id']
+        logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
 
         if len(getattr(setup_frame, args.scoring).unique()) == 1:
             logging.warning('Not enough unique performance measures for task %d. Skipping' % task_id)
@@ -296,14 +245,14 @@ def run(args):
             continue
 
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
-            task_id, config_space, setup_frame, args.scoring)
+            task_id, config_space, setup_frame, args.scoring, 64, args.random_seed)
         if not np.array_equal(config_frame_orig.columns.values, columns):
             # if this goes wrong, it is due to the pd.get_dummies() fn
             raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
         surrogates[task_id] = estimator
 
-    os.makedirs(os.path.join(args.output_directory, args.classifier), exist_ok=True)
-    output_file = os.path.join(args.output_directory, args.classifier, 'results_all.pkl')
+    os.makedirs(os.path.join(args.output_directory, args.classifier_name), exist_ok=True)
+    output_file = os.path.join(args.output_directory, args.classifier_name, 'results_all.pkl')
     if args.task_idx is None:
         logging.info('Evaluating on train tasks')
         run_on_tasks(config_frame_orig=config_frame_orig,
@@ -317,7 +266,7 @@ def run(args):
         task_id = study.tasks[args.task_idx]
         logging.info('Evaluating on holdout task %d (%d/%d)' %
                      (task_id, args.task_idx + 1, len(study.tasks)))
-        output_file = os.path.join(args.output_directory, args.classifier, 'results_%d.pkl' % task_id)
+        output_file = os.path.join(args.output_directory, args.classifier_name, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
                      quality_frame=quality_frame,
@@ -328,4 +277,5 @@ def run(args):
 
 
 if __name__ == '__main__':
+    pd.options.mode.chained_assignment = 'raise'
     run(parse_args())
