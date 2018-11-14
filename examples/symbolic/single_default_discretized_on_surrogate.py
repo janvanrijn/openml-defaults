@@ -33,7 +33,7 @@ def single_prediction(df: pd.DataFrame,
                       config: typing.Dict) -> float:
     # TODO: might break with categoricals
     df = pd.DataFrame(columns=df.columns.values)
-    df = df.append(config, ignore_index=True) # TODO: ignore true ?
+    df = df.append(config, ignore_index=True)  # TODO: ignore true ?
     return surrogate.predict(df.values)[0]
 
 
