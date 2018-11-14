@@ -2,7 +2,7 @@ import argparse
 import openmldefaults
 import os
 
-from examples.vanilla.generate_defaults import run as generate_defaults
+from examples.legacy.generate_defaults import run as generate_defaults
 
 
 def parse_args():
