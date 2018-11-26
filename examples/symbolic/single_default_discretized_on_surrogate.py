@@ -28,15 +28,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def single_prediction(df: pd.DataFrame,
-                      surrogate: sklearn.pipeline.Pipeline,
-                      config: typing.Dict) -> float:
-    # TODO: might break with categoricals
-    df = pd.DataFrame(columns=df.columns.values)
-    df = df.append(config, ignore_index=True)  # TODO: ignore true ?
-    return surrogate.predict(df.values)[0]
-
-
 def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
                                            surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
                                            surrogate_train_cols: np.array,
@@ -85,12 +76,15 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     baseline_holdout = None
     baseline_random_search = None
     if hold_out_task is not None:
-        baseline_holdout = single_prediction(config_frame_orig,
-                                             hold_out_surrogate,
-                                             baseline_configuration)
-        baseline_random_search = [single_prediction(config_frame_orig,
-                                                    hold_out_surrogate,
-                                                    config_space.sample_configuration(1).get_dictionary()) for i in range(50)]
+        baseline_holdout = openmldefaults.utils.single_prediction(config_frame_orig,
+                                                                  hold_out_surrogate,
+                                                                  baseline_configuration)
+        baseline_random_search = [
+            openmldefaults.utils.single_prediction(config_frame_orig,
+                                                   hold_out_surrogate,
+                                                   config_space.sample_configuration(1).get_dictionary())
+            for i in range(50)
+        ]
     logging.info('Baseline: %s [%s] %s. Holdout task: %s' % (baseline_configuration,
                                                              baseline_results_per_task,
                                                              baseline_avg_performance,
@@ -136,9 +130,9 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                             if hold_out_surrogate is not None:
                                 symbolic_value = transform_fn(alpha_value, quality_frame[meta_feature][hold_out_task])
                                 symbolic_config[hyperparameter.name] = symbolic_value
-                                symbolic_holdout_score = single_prediction(config_frame_orig,
-                                                                           hold_out_surrogate,
-                                                                           symbolic_config)
+                                symbolic_holdout_score = openmldefaults.utils.single_prediction(config_frame_orig,
+                                                                                                hold_out_surrogate,
+                                                                                                symbolic_config)
                             current_result = {
                                 'configuration': symbolic_config,
                                 'results_per_task': symbolic_results_per_task,

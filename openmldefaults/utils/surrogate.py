@@ -4,8 +4,10 @@ import logging
 import math
 import numpy as np
 import openmlcontrib
+import openmldefaults
 import pandas as pd
 import sklearn
+import sklearn.ensemble
 import typing
 
 
@@ -163,9 +165,47 @@ def train_surrogate_on_task(task_id: int,
     return surrogate, setup_data.columns.values
 
 
+def generate_grid_dataset(metadata_frame: pd.DataFrame,
+                          config_space: ConfigSpace.ConfigurationSpace,
+                          resized_grid_size: int,
+                          scoring: str,
+                          random_seed: int) -> pd.DataFrame:
+    configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, resized_grid_size)
+
+    df_orig = pd.DataFrame(configurations)
+    logging.info('Meta-dataset dimensions: %s' % str(df_orig.shape))
+
+    # copy of df_orig. Prevent copy function for correct type hints
+    df_surrogate = pd.DataFrame(configurations)
+    for task_id in metadata_frame['task_id'].unique():
+        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
+        del setup_frame['task_id']
+        try:
+            estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
+                                                                              config_space,
+                                                                              setup_frame,
+                                                                              scoring,
+                                                                              64,
+                                                                              random_seed)
+        except ValueError as e:
+            print('Error at task %d: %s' % (task_id, e))
+            continue
+        if not np.array_equal(df_orig.columns.values, columns):
+            # if this goes wrong, it is due to the pd.get_dummies() fn
+            raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
+        surrogate_values = estimator.predict(df_orig.values)
+        df_surrogate['%s_task_%d' % (scoring, task_id)] = surrogate_values
+
+    if df_surrogate.shape[0] != len(configurations):
+        raise ValueError('surrogate frame has wrong number of instances. Expected: %d Got %d' % (len(configurations),
+                                                                                                 df_surrogate.shape[0]))
+    df_surrogate = df_surrogate.set_index(config_space.get_hyperparameter_names())
+    return df_surrogate
+
+
 def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.ConfigurationSpace, scoring: str) -> pd.DataFrame:
     """
-    Loads a meta-data set, as outputted by sklearn bot, and removes redundent
+    Loads a meta-data set, as outputted by sklearn bot, and removes redundant
     columns and rows
     """
     with open(metadata_file, 'r') as fp:
@@ -198,3 +238,11 @@ def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.Configu
         raise ValueError()
     logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
     return metadata_frame
+
+
+def single_prediction(df: pd.DataFrame,
+                      surrogate: sklearn.pipeline.Pipeline,
+                      config: typing.Dict) -> float:
+    df = pd.DataFrame(columns=df.columns.values)
+    df = df.append(config, ignore_index=True)
+    return surrogate.predict(df.values)[0]
