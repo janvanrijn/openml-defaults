@@ -18,7 +18,7 @@ class TestCvFunctions(unittest.TestCase):
             {'max_depth': 10, 'min_samples_leaf': 1},
         ]
 
-        search = openmldefaults.search.DefaultSearchCV(estimator, defaults)
+        search = sklearn.model_selection.GridSearchCV(estimator, openmldefaults.search.convert_defaults_to_param_grid(defaults))
         search.fit(X, y)
 
         self.assertListEqual(list(search.cv_results_['params']), defaults)

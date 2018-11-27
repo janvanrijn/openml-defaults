@@ -1,1 +1,1 @@
-from .default_search import DefaultSearchCV
+from .default_search import convert_defaults_to_param_grid
