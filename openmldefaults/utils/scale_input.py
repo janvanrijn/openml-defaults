@@ -17,12 +17,36 @@ def selected_set(df: pd.DataFrame, defaults: List[Tuple], column_slice: List=Non
     return result
 
 
-def selected_set_index(df: pd.DataFrame, indices: List[int]):
+def selected_set_index(df: pd.DataFrame, indices: List[int], minimize: bool) -> List[float]:
+    """
+    Convenience function. Returns per row the (minimum, maximum) of a selected
+    set of columns.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        A dataframe with each column representing a dataset, and each row
+        representing a configuration.
+    indices: List
+        The rows to select
+    minimize: bool
+        Whether to return the sum of column-wise minimum or the sum of
+        column-wise maximum
+
+    Returns
+    -------
+    List[float]
+         per column (minimum, maximum) of the selected rows
+    """
     # filters out only the algorithms that we have in the 'set of defaults'
     df = df.iloc[indices]
     # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
     # then we take the median of this
-    result = df.min(axis=0)
+    if minimize:
+        result = df.min(axis=0)
+    else:
+        result = df.max(axis=0)
+
     if np.isnan(sum(result)):
         raise ValueError('None of the results of this function should be NaN')
     return result

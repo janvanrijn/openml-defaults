@@ -13,6 +13,7 @@ import sklearnbot
 import typing
 
 
+# sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
 def parse_args():
     metadata_file = '/home/janvanrijn/experiments/sklearn-bot/results/results__500__svc__predictive_accuracy.arff'
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
@@ -32,11 +33,6 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    study = openml.study.get_study(args.study_id, 'tasks')
-    study.tasks = study.tasks
-    if 34536 in study.tasks:
-        study.tasks.remove(34536)
-
     config_space = sklearnbot.config_spaces.get_config_space(args.classifier_name, args.random_seed)
 
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
@@ -49,7 +45,8 @@ def run(args):
                                                               args.resized_grid_size,
                                                               args.scoring,
                                                               args.random_seed)
-    print(config_frame)
+    model = openmldefaults.models.GreedyDefaults()
+    model.generate_defaults(config_frame, 32, False)
 
 
 if __name__ == '__main__':

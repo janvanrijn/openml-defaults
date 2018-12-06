@@ -34,7 +34,8 @@ class GreedyDefaults(object):
             A dictionary containing the defaults, indices of the defaults,
             objective score and the run time of this algorithm.
         """
-        logging.info('Started %s' % self.name)
+        logging.info('Started %s, dimensions config frame %s' % (self.name,
+                                                                 str(df.shape)))
         if num_defaults < 1:
             raise ValueError()
         start_time = time.time()
@@ -46,13 +47,15 @@ class GreedyDefaults(object):
             best_addition = None
             best_index = None
             for idx, current_config in enumerate(df.index.values):
-                current_score = sum(openmldefaults.utils.selected_set_index(df, selected_indices + [idx]))
+                current_score = sum(openmldefaults.utils.selected_set_index(df, selected_indices + [idx], minimize))
                 if best_score is None \
                         or (minimize and current_score < best_score) \
                         or ((not minimize) and current_score > best_score):
                     best_score = current_score
                     best_addition = current_config
                     best_index = idx
+            if best_addition is None:
+                raise ValueError('Could not add default, as there were no configurations that yield improvement')
             selected_configs.append(best_addition)
             selected_indices.append(best_index)
 
