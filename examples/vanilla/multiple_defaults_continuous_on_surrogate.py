@@ -70,22 +70,28 @@ def run(args):
     config_hash = openmldefaults.utils.hash_df(config_frame_tr)
     result_directory = os.path.join(args.output_directory, str(task_id), args.strategy)
     os.makedirs(result_directory, exist_ok=True)
-    result_filepath = os.path.join(result_directory, 'defaults_%s_%d_%d.pkl' % (config_hash,
-                                                                                args.n_defaults,
-                                                                                minimize))
-    if os.path.isfile(result_filepath):
-        with open(result_filepath, 'rb') as fp:
+    result_filepath_defaults = os.path.join(result_directory, 'defaults_%s_%d_%d.pkl' % (config_hash,
+                                                                                         args.n_defaults,
+                                                                                         minimize))
+    result_filepath_results = os.path.join(result_directory, 'results_%s_%d_%d.pkl' % (config_hash,
+                                                                                       args.n_defaults,
+                                                                                       minimize))
+    if os.path.isfile(result_filepath_defaults):
+        with open(result_filepath_defaults, 'rb') as fp:
             result = pickle.load(fp)
         logging.info('defaults loaded from cache')
     else:
         model = openmldefaults.models.GreedyDefaults()
         result = model.generate_defaults(config_frame_tr, args.n_defaults, minimize)
-        with open(result_filepath, 'wb') as fp:
+        with open(result_filepath_defaults, 'wb') as fp:
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated')
 
     holdout_score = sum(openmldefaults.utils.selected_set_index(config_frame_te, result['indices'], minimize))
-    print(holdout_score)
+    result['holdout_score'] = holdout_score
+    with open(result_filepath_results, 'wb') as fp:
+        pickle.dump(result, fp, protocol=0)
+    logging.info('Saved result to %s' % result_filepath_results)
 
 
 if __name__ == '__main__':
