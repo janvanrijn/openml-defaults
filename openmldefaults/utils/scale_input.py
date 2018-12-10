@@ -38,6 +38,7 @@ def selected_set_index(df: pd.DataFrame, indices: List[int], minimize: bool) -> 
     List[float]
          per column (minimum, maximum) of the selected rows
     """
+    is_series = isinstance(df, pd.Series)
     # filters out only the algorithms that we have in the 'set of defaults'
     df = df.iloc[indices]
     # df.min(axis=0) returns per dataset the minimum score obtained by 'set of defaults'
@@ -46,7 +47,8 @@ def selected_set_index(df: pd.DataFrame, indices: List[int], minimize: bool) -> 
         result = df.min(axis=0)
     else:
         result = df.max(axis=0)
-
+    if is_series:
+        result = [result]
     if np.isnan(sum(result)):
         raise ValueError('None of the results of this function should be NaN')
     return result

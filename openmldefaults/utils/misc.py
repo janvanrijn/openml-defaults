@@ -1,4 +1,6 @@
 import ConfigSpace
+import hashlib
+import pandas as pd
 
 
 def remove_hyperparameter(config_space: ConfigSpace.ConfigurationSpace,
@@ -13,3 +15,7 @@ def remove_hyperparameter(config_space: ConfigSpace.ConfigurationSpace,
         else:
             raise ValueError()
     return config_space_prime
+
+
+def hash_df(df):
+    return hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values).hexdigest()
