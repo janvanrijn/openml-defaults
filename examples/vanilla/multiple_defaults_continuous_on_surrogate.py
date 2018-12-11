@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=2)
     parser.add_argument('--random_seed', type=int, default=42)
-    parser.add_argument('--task_limit', type=int, default=4, help='For speed')
+    parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     return parser.parse_args()
 
 
