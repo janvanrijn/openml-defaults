@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument('--metadata_file', type=str, default=metadata_file)
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
-    parser.add_argument('--search_space', type=str, default='small')
+    parser.add_argument('--search_space_identifier', type=str, default='small')
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=64)
@@ -31,19 +31,15 @@ def parse_args():
     return args_
 
 
-def run(args):
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
+def run_on_task(task_id, args):
+    logging.info('Starting on Task %d' % task_id)
     memory = joblib.Memory(location=os.path.join(args.output_directory, '.cache'), verbose=0)
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
 
-    study = openml.study.get_study(args.study_id, 'tasks')
-    task_id = study.tasks[args.task_idx]
-
     config_space = openmldefaults.config_spaces.get_config_space(args.classifier_name,
                                                                  args.random_seed,
-                                                                 args.search_space)
+                                                                 args.search_space_identifier)
 
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
     if args.scoring not in metadata_atts['measure']:
@@ -124,6 +120,15 @@ def run(args):
                 total_time = current_time + total_time
                 writer.writerow({args.scoring: best_score, usercpu_time: total_time})
         logging.info('results generated, saved to: %s' % result_filepath_results)
+
+
+def run(args):
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    study = openml.study.get_study(args.study_id, 'tasks')
+    task_id = study.tasks[args.task_idx]
+    run_on_task(task_id, args)
 
 
 if __name__ == '__main__':
