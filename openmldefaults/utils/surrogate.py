@@ -106,12 +106,21 @@ def train_surrogate_on_task(task_id: int,
                             config_space: ConfigSpace.ConfigurationSpace,
                             setup_data: pd.DataFrame,
                             evaluation_measure: str,
+                            normalize: bool,
                             n_estimators,
                             random_seed) \
         -> typing.Tuple[sklearn.pipeline.Pipeline, typing.List]:
     """
     Trains a surrogate on the meta-data from a task.
     """
+    # delete unnecessary columns
+    legal_columns = set(config_space.get_hyperparameter_names() + [evaluation_measure])
+    for column in setup_data.columns.values:
+        if column not in legal_columns:
+            del setup_data[column]
+    if set(setup_data.columns.values) != legal_columns:
+        raise ValueError('Columns for surrogate do not align with expectations')
+
     nominal_values_min = 10
     # obtain the data
     scaler = sklearn.preprocessing.MinMaxScaler()
@@ -119,13 +128,14 @@ def train_surrogate_on_task(task_id: int,
     # sort columns!
     setup_data.sort_index(axis=1, inplace=True)
     # reshape because of sklearn api (does not work on vectors)
-    y_reshaped = setup_data[evaluation_measure].values.reshape(-1, 1)
-    setup_data[evaluation_measure] = scaler.fit_transform(y_reshaped)[:, 0]
+    if normalize:
+        y_reshaped = setup_data[evaluation_measure].values.reshape(-1, 1)
+        setup_data[evaluation_measure] = scaler.fit_transform(y_reshaped)[:, 0]
 
-    min_val = min(setup_data[evaluation_measure])
-    assert math.isclose(min_val, 0.0), 'Not close to 0.0: %f' % min_val
-    max_val = max(setup_data[evaluation_measure])
-    assert math.isclose(max_val, 1.0), 'Not close to 1.0: %f' % max_val
+        min_val = min(setup_data[evaluation_measure])
+        assert math.isclose(min_val, 0.0), 'Not close to 0.0: %f' % min_val
+        max_val = max(setup_data[evaluation_measure])
+        assert math.isclose(max_val, 1.0), 'Not close to 1.0: %f' % max_val
 
     # assert that we have ample values for all categorical options
     for hyperparameter in config_space:
@@ -230,6 +240,7 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
                                                                               config_space,
                                                                               setup_frame,
                                                                               scoring,
+                                                                              False,  # we will normalize predictions
                                                                               64,
                                                                               random_seed)
         except ValueError as e:
@@ -256,7 +267,7 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
     return df_surrogate
 
 
-def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.ConfigurationSpace, scoring: str) -> pd.DataFrame:
+def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.ConfigurationSpace, scoring: typing.List[str]) -> pd.DataFrame:
     """
     Loads a meta-data set, as outputted by sklearn bot, and removes redundant
     columns and rows
@@ -265,7 +276,7 @@ def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.Configu
         metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
 
     # TODO: modularize. Remove unnecessary columns
-    legal_column_names = config_space.get_hyperparameter_names() + [scoring] + ['task_id']
+    legal_column_names = config_space.get_hyperparameter_names() + scoring + ['task_id']
     logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
     for column_name in metadata_frame.columns.values:
         if column_name not in legal_column_names:
@@ -278,7 +289,8 @@ def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.Configu
         # conditionals can be nan. filter these out with notnull()
         config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
         del config['task_id']
-        del config[scoring]
+        for measure in scoring:
+            del config[measure]
 
         try:
             ConfigSpace.Configuration(config_space, config)
