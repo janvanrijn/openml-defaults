@@ -55,7 +55,9 @@ class GreedyDefaults(object):
                     best_addition = current_config
                     best_index = idx
             if best_addition is None:
-                raise ValueError('Could not add default, as there were no configurations that yield improvement')
+                raise ValueError('Could not add default, as there were no '
+                                 'configurations that yield improvement after '
+                                 '%d defaults' % len(selected_configs))
             selected_configs.append(best_addition)
             selected_indices.append(best_index)
 

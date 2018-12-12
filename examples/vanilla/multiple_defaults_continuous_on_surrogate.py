@@ -22,11 +22,12 @@ def parse_args():
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space', type=str, default='small')
     parser.add_argument('--minimize', action='store_true')
-    parser.add_argument('--resized_grid_size', type=int, default=8)
-    parser.add_argument('--n_defaults', type=int, default=128)
+    parser.add_argument('--resized_grid_size', type=int, default=3)
+    parser.add_argument('--n_defaults', type=int, default=5)
     parser.add_argument('--random_seed', type=int, default=42)
-    parser.add_argument('--task_limit', type=int, default=None, help='For speed')
-    return parser.parse_args()
+    parser.add_argument('--task_limit', type=int, default=10, help='For speed')
+    args_ = parser.parse_args()
+    return args_
 
 
 def run(args):
@@ -81,9 +82,10 @@ def run(args):
                                                               False,
                                                               -1)
         config_frame_te[measure] = frame_te
-    # adds A3R
-    config_frame_tr[a3r] = config_frame_tr[args.scoring] / config_frame_tr[usercpu_time]
-    config_frame_te[a3r] = config_frame_te[args.scoring] / config_frame_te[usercpu_time]
+    # adds A3R and normalizes it
+    config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[args.scoring],
+                                                                 config_frame_tr[usercpu_time])
+    config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r])
 
     # whether to optimize scoring is parameterized, same for a3r (which follows from scoring). runtime always min
     for measure, minimize in [(args.scoring, args.minimize), (usercpu_time, True), (a3r, args.minimize)]:
