@@ -15,7 +15,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults/')
-    parser.add_argument('--strategy', type=str, default='max_accuracy')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--metadata_file', type=str, default=metadata_file)
@@ -24,7 +23,7 @@ def parse_args():
     parser.add_argument('--search_space_identifier', type=str, default='small')
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--resized_grid_size', type=int, default=8)
-    parser.add_argument('--n_defaults', type=int, default=64)
+    parser.add_argument('--n_defaults', type=int, default=32)
     parser.add_argument('--random_seed', type=int, default=42)
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     args_ = parser.parse_args()
