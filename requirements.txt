@@ -1,6 +1,7 @@
 ConfigSpace
 Cython
 feather-format
+joblib
 liac-arff
 matplotlib
 numpy
