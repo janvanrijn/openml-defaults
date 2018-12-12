@@ -22,4 +22,8 @@ def create_a3r_frame(scoring_frame: pd.DataFrame, runtime_frame: pd.DataFrame) -
     """
     min_val = np.min(runtime_frame.values[np.nonzero(runtime_frame.values)])
     runtime_frame = runtime_frame.replace(0, min_val)
-    return scoring_frame.divide(runtime_frame)
+    assert(np.array_equal(scoring_frame.columns.values, runtime_frame.columns.values))
+    for ridx, row in scoring_frame.iterrows():
+        for column in scoring_frame.columns.values:
+            scoring_frame.loc[ridx][column] = scoring_frame.loc[ridx][column] / runtime_frame.loc[ridx][column]
+    return scoring_frame

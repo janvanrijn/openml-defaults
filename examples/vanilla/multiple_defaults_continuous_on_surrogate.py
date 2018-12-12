@@ -1,5 +1,6 @@
 import argparse
 import csv
+import joblib
 import logging
 import pickle
 import openml
@@ -33,6 +34,7 @@ def parse_args():
 def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
+    memory = joblib.Memory(location=os.path.join(args.output_directory, '.cache'), verbose=0)
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
 
@@ -49,7 +51,8 @@ def run(args):
     if usercpu_time not in metadata_atts['measure']:
         raise ValueError('Could not find measure: %s' % usercpu_time)
     measures = [args.scoring, usercpu_time]
-    metadata_frame = openmldefaults.utils.metadata_file_to_frame(args.metadata_file, config_space, measures)
+    metadata_file_to_frame = memory.cache(openmldefaults.utils.metadata_file_to_frame)
+    metadata_frame = metadata_file_to_frame(args.metadata_file, config_space, measures)
 
     tasks_tr = list(metadata_frame['task_id'].unique())
     tasks_tr.remove(task_id)
@@ -91,25 +94,17 @@ def run(args):
     for measure, minimize in [(args.scoring, args.minimize), (usercpu_time, True), (a3r, args.minimize)]:
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
-        config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
+        # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
         result_directory = os.path.join(args.output_directory, str(task_id), strategy)
         os.makedirs(result_directory, exist_ok=True)
-        result_filepath_defaults = os.path.join(result_directory, 'defaults_%s_%d_%d.pkl' % (config_hash,
-                                                                                             args.n_defaults,
-                                                                                             minimize))
-        result_filepath_results = os.path.join(result_directory, 'results_%s_%d_%d.csv' % (config_hash,
-                                                                                           args.n_defaults,
-                                                                                           minimize))
-        if os.path.isfile(result_filepath_defaults):
-            with open(result_filepath_defaults, 'rb') as fp:
-                result = pickle.load(fp)
-            logging.info('defaults loaded from cache')
-        else:
-            model = openmldefaults.models.GreedyDefaults()
-            result = model.generate_defaults(config_frame_tr[measure], args.n_defaults, minimize)
-            with open(result_filepath_defaults, 'wb') as fp:
-                pickle.dump(result, fp, protocol=0)
-            logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
+        result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (args.n_defaults, minimize))
+        result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (args.n_defaults, minimize))
+
+        model = openmldefaults.models.GreedyDefaults()
+        result = model.generate_defaults(config_frame_tr[measure], args.n_defaults, minimize)
+        with open(result_filepath_defaults, 'wb') as fp:
+            pickle.dump(result, fp, protocol=0)
+        logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
 
         with open(result_filepath_results, 'w') as csvfile:
             best_score = 1.0 if args.minimize else 0.0
