@@ -23,10 +23,10 @@ def parse_args():
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space', type=str, default='small')
     parser.add_argument('--minimize', action='store_true')
-    parser.add_argument('--resized_grid_size', type=int, default=3)
-    parser.add_argument('--n_defaults', type=int, default=5)
+    parser.add_argument('--resized_grid_size', type=int, default=8)
+    parser.add_argument('--n_defaults', type=int, default=64)
     parser.add_argument('--random_seed', type=int, default=42)
-    parser.add_argument('--task_limit', type=int, default=10, help='For speed')
+    parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     args_ = parser.parse_args()
     return args_
 

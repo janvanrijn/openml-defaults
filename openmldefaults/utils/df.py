@@ -10,9 +10,10 @@ def hash_df(df: pd.DataFrame) -> str:
 
 def normalize_df_columnwise(df: pd.DataFrame) -> pd.DataFrame:
     min_max_scaler = sklearn.preprocessing.MinMaxScaler()
-    np_scaled = min_max_scaler.fit_transform(df)
-    df_normalized = pd.DataFrame(np_scaled)
-    return df_normalized
+    for column in df.columns.values:
+        res = min_max_scaler.fit_transform(df[column].values.reshape(-1, 1))[:, 0]
+        df[column] = res
+    return df
 
 
 def create_a3r_frame(scoring_frame: pd.DataFrame, runtime_frame: pd.DataFrame) -> pd.DataFrame:
@@ -23,7 +24,5 @@ def create_a3r_frame(scoring_frame: pd.DataFrame, runtime_frame: pd.DataFrame) -
     min_val = np.min(runtime_frame.values[np.nonzero(runtime_frame.values)])
     runtime_frame = runtime_frame.replace(0, min_val)
     assert(np.array_equal(scoring_frame.columns.values, runtime_frame.columns.values))
-    for ridx, row in scoring_frame.iterrows():
-        for column in scoring_frame.columns.values:
-            scoring_frame.loc[ridx][column] = scoring_frame.loc[ridx][column] / runtime_frame.loc[ridx][column]
-    return scoring_frame
+    assert(np.array_equal(scoring_frame.shape, runtime_frame.shape))
+    return scoring_frame / runtime_frame
