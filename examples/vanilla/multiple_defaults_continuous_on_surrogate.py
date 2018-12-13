@@ -10,6 +10,7 @@ import pandas as pd
 
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
+# sshfs jv2657@habanero.rcs.columbia.edu:/rigel/dsi/users/jv2657/experiments ~/habanero_experiments
 def parse_args():
     metadata_file = os.path.expanduser('~/data/openml-defaults/svc.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
