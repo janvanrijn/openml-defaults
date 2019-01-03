@@ -17,12 +17,14 @@ def parse_args():
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
-    parser.add_argument('--task_idx', type=int, default=0)
+    parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--metadata_file', type=str, default=metadata_file)
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space_identifier', type=str, default='small')
     parser.add_argument('--minimize', action='store_true')
+    parser.add_argument('--normalize_base', action='store_true')
+    parser.add_argument('--normalize_a3r', action='store_true')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
     parser.add_argument('--random_seed', type=int, default=42)
@@ -34,6 +36,10 @@ def parse_args():
 def run_on_task(task_id, args):
     logging.info('Starting on Task %d' % task_id)
     memory = joblib.Memory(location=os.path.join(args.output_directory, '.cache'), verbose=0)
+    metadata_file_to_frame = memory.cache(openmldefaults.utils.metadata_file_to_frame)
+    generate_grid_dataset = memory.cache(openmldefaults.utils.generate_grid_dataset)
+    model = openmldefaults.models.GreedyDefaults()
+    generate_defaults = memory.cache(model.generate_defaults)
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
 
@@ -47,7 +53,6 @@ def run_on_task(task_id, args):
     if usercpu_time not in metadata_atts['measure']:
         raise ValueError('Could not find measure: %s' % usercpu_time)
     measures = [args.scoring, usercpu_time]
-    metadata_file_to_frame = memory.cache(openmldefaults.utils.metadata_file_to_frame)
     metadata_frame = metadata_file_to_frame(args.metadata_file, config_space, measures)
 
     tasks_tr = list(metadata_frame['task_id'].unique())
@@ -59,45 +64,46 @@ def run_on_task(task_id, args):
     configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
     config_frame_tr = dict()
     config_frame_te = dict()
-    for measure, normalize in [(args.scoring, True), (usercpu_time, True)]:
+    for measure, normalize in [(args.scoring, args.normalize_base), (usercpu_time, args.normalize_base)]:
         logging.info('Generating frames for measure: %s' % measure)
-        frame_tr = openmldefaults.utils.generate_grid_dataset(metadata_frame,
-                                                              configurations,
-                                                              tasks_tr,
-                                                              config_space,
-                                                              measure,
-                                                              normalize,
-                                                              args.random_seed,
-                                                              False,
-                                                              -1)
+        frame_tr = generate_grid_dataset(metadata_frame,
+                                         configurations,
+                                         tasks_tr,
+                                         config_space,
+                                         measure,
+                                         normalize,
+                                         args.random_seed,
+                                         False,
+                                         -1)
         config_frame_tr[measure] = frame_tr
-        frame_te = openmldefaults.utils.generate_grid_dataset(metadata_frame,
-                                                              configurations,
-                                                              tasks_te,
-                                                              config_space,
-                                                              measure,
-                                                              False,
-                                                              args.random_seed,
-                                                              False,
-                                                              -1)
+        frame_te = generate_grid_dataset(metadata_frame,
+                                         configurations,
+                                         tasks_te,
+                                         config_space,
+                                         measure,
+                                         False,
+                                         args.random_seed,
+                                         False,
+                                         -1)
         config_frame_te[measure] = frame_te
-    # adds A3R and normalizes it
+    # adds A3R frame
     config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[args.scoring],
                                                                  config_frame_tr[usercpu_time])
-    config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r])
+    if args.normalize_a3r:
+        # normalizes A3R frame
+        config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r])
 
     # whether to optimize scoring is parameterized, same for a3r (which follows from scoring). runtime always min
     for measure, minimize in [(args.scoring, args.minimize), (usercpu_time, True), (a3r, args.minimize)]:
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
-        result_directory = os.path.join(args.output_directory, str(task_id), strategy)
+        result_directory = os.path.join(args.output_directory, str(task_id), strategy, str(args.normalize_base), str(args.normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (args.n_defaults, minimize))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (args.n_defaults, minimize))
 
-        model = openmldefaults.models.GreedyDefaults()
-        result = model.generate_defaults(config_frame_tr[measure], args.n_defaults, minimize)
+        result = generate_defaults(config_frame_tr[measure], args.n_defaults, minimize)
         with open(result_filepath_defaults, 'wb') as fp:
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
@@ -127,8 +133,13 @@ def run(args):
     root.setLevel(logging.INFO)
 
     study = openml.study.get_study(args.study_id, 'tasks')
-    task_id = study.tasks[args.task_idx]
-    run_on_task(task_id, args)
+    if args.task_idx is None:
+        for task_idx in range(len(study.tasks)):
+            task_id = study.tasks[task_idx]
+            run_on_task(task_id, args)
+    else:
+        task_id = study.tasks[args.task_idx]
+        run_on_task(task_id, args)
 
 
 if __name__ == '__main__':
