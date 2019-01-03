@@ -1,17 +1,34 @@
 import hashlib
+import logging
 import numpy as np
 import pandas as pd
+import sklearn.base
 import sklearn.preprocessing
+import typing
 
 
 def hash_df(df: pd.DataFrame) -> str:
     return hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values).hexdigest()
 
 
-def normalize_df_columnwise(df: pd.DataFrame) -> pd.DataFrame:
-    min_max_scaler = sklearn.preprocessing.MinMaxScaler()
+def get_scaler(scaling_type: typing.Optional[str]) -> sklearn.base.TransformerMixin:
+    legal_types = {
+        'MinMaxScaler': sklearn.preprocessing.MinMaxScaler(),
+        'StandardScaler': sklearn.preprocessing.StandardScaler()
+    }
+    if scaling_type not in legal_types:
+        raise ValueError('Can not find scaling type: %s' % scaling_type)
+    return legal_types[scaling_type]
+
+
+def normalize_df_columnwise(df: pd.DataFrame, scaling_type: typing.Optional[str]) -> pd.DataFrame:
+    logging.info('scaling dataframe (no specific measure indicated) with %s' % scaling_type)
+    if scaling_type is None:
+        return df
+
+    scaler = get_scaler(scaling_type)
     for column in df.columns.values:
-        res = min_max_scaler.fit_transform(df[column].values.reshape(-1, 1))[:, 0]
+        res = scaler.fit_transform(df[column].values.reshape(-1, 1))[:, 0]
         df[column] = res
     return df
 

@@ -180,7 +180,7 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
                           task_ids: typing.List[int],
                           config_space: ConfigSpace.ConfigurationSpace,
                           scoring: str,
-                          normalize: bool,
+                          scaler_type: typing.Optional[str],
                           random_seed: int,
                           prefix_with_scoring: bool,
                           fill_nans: typing.Optional[float]) -> pd.DataFrame:
@@ -203,7 +203,7 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
         Determines which hyperparameters are relevant
     scoring: str
         The optimization criterion. Should be a column of meta-data frame
-    normalize: bool
+    scaler_type: str (optional)
         Whether to normalize the resulting frame (column-wise)
     random_seed: int
         A random seed, used for the surrogate model
@@ -250,8 +250,9 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
             # if this goes wrong, it is due to the pd.get_dummies() fn
             raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
         surrogate_values = estimator.predict(df_orig.values)
-        if normalize:
-            scaler = sklearn.preprocessing.MinMaxScaler()
+        if scaler_type is not None:
+            logging.info('scaling %s dataframe using %s' % (scoring, scaler_type))
+            scaler = openmldefaults.utils.get_scaler(scaler_type)
             surrogate_values = scaler.fit_transform(surrogate_values.reshape(-1, 1))[:, 0]
         column_name = 'task_%d' % task_id
         if prefix_with_scoring:

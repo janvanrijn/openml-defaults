@@ -32,9 +32,9 @@ def parse_args():
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space_identifier', type=str, default='small')
     parser.add_argument('--minimize', action='store_true')
-    parser.add_argument('--normalize_base', action='store_true')
-    parser.add_argument('--normalize_a3r', action='store_true')
-    parser.add_argument('--aggregate', type=str, choices=AGGREGATES.keys(), default='median')
+    parser.add_argument('--normalize_base', type=str, default=None)
+    parser.add_argument('--normalize_a3r', type=str, default='StandardScaler')
+    parser.add_argument('--aggregate', type=str, choices=AGGREGATES.keys(), default='sum')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
     parser.add_argument('--random_seed', type=int, default=42)
@@ -91,7 +91,7 @@ def run_on_task(task_id, args):
                                          tasks_te,
                                          config_space,
                                          measure,
-                                         False,
+                                         None,
                                          args.random_seed,
                                          False,
                                          -1)
@@ -99,9 +99,8 @@ def run_on_task(task_id, args):
     # adds A3R frame
     config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[args.scoring],
                                                                  config_frame_tr[usercpu_time])
-    if args.normalize_a3r:
-        # normalizes A3R frame
-        config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r])
+
+    config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r], args.normalize_a3r)
 
     # whether to optimize scoring is parameterized, same for a3r (which follows from scoring). runtime always min
     for measure, minimize in [(args.scoring, args.minimize), (usercpu_time, True), (a3r, args.minimize)]:
