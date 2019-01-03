@@ -2,6 +2,7 @@ import logging
 import openmldefaults
 import pandas as pd
 import time
+import typing
 
 
 class GreedyDefaults(object):
@@ -9,7 +10,7 @@ class GreedyDefaults(object):
     def __init__(self):
         self.name = 'greedy'
 
-    def generate_defaults(self, df: pd.DataFrame, num_defaults: int, minimize: bool):
+    def generate_defaults(self, df: pd.DataFrame, num_defaults: int, minimize: bool, aggregate: typing.Callable):
         """
         Takes a data frame and returns the greedy defaults. The data frame
         should be structured as follows: each column represents a task, each row
@@ -27,6 +28,9 @@ class GreedyDefaults(object):
 
         minimize: bool
             Will minimize the objective function iff this is true.
+
+        aggregate: callable
+            function to aggregate per task results
 
         Returns
         -------
@@ -47,7 +51,8 @@ class GreedyDefaults(object):
             best_addition = None
             best_index = None
             for idx, current_config in enumerate(df.index.values):
-                current_score = sum(openmldefaults.utils.selected_set_index(df, selected_indices + [idx], minimize))
+                per_task_scores = openmldefaults.utils.selected_set_index(df, selected_indices + [idx], minimize)
+                current_score = aggregate(per_task_scores)
                 if best_score is None \
                         or (minimize and current_score < best_score) \
                         or ((not minimize) and current_score > best_score):

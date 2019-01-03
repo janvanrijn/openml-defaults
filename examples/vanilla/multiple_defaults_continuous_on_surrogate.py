@@ -7,6 +7,15 @@ import openml
 import openmldefaults
 import os
 import pandas as pd
+import statistics
+
+
+AGGREGATES = {
+    'median': statistics.median,
+    'min': min,
+    'max': max,
+    'sum': sum,
+}
 
 
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
@@ -25,6 +34,7 @@ def parse_args():
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--normalize_base', action='store_true')
     parser.add_argument('--normalize_a3r', action='store_true')
+    parser.add_argument('--aggregate', type=str, choices=AGGREGATES.keys(), default='median')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
     parser.add_argument('--random_seed', type=int, default=42)
@@ -98,12 +108,12 @@ def run_on_task(task_id, args):
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
-        result_directory = os.path.join(args.output_directory, str(task_id), strategy, str(args.normalize_base), str(args.normalize_a3r))
+        result_directory = os.path.join(args.output_directory, str(task_id), strategy, args.aggregate, str(args.normalize_base), str(args.normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (args.n_defaults, minimize))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (args.n_defaults, minimize))
 
-        result = generate_defaults(config_frame_tr[measure], args.n_defaults, minimize)
+        result = generate_defaults(config_frame_tr[measure], args.n_defaults, minimize, AGGREGATES[args.aggregate])
         with open(result_filepath_defaults, 'wb') as fp:
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
