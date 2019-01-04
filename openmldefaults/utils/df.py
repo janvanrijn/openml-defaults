@@ -33,13 +33,15 @@ def normalize_df_columnwise(df: pd.DataFrame, scaling_type: typing.Optional[str]
     return df
 
 
-def create_a3r_frame(scoring_frame: pd.DataFrame, runtime_frame: pd.DataFrame) -> pd.DataFrame:
+def create_a3r_frame(scoring_frame: pd.DataFrame, runtime_frame: pd.DataFrame, a3r_r: int) -> pd.DataFrame:
     """
     Replaces all occurrences of zero in the runtime frame with the min val (to
-    prevent division by zero) and uses this frame to create a a3r frame.
+    prevent division by zero) and uses accuracy and runtime frames to create an
+    a3r frame.
     """
     min_val = np.min(runtime_frame.values[np.nonzero(runtime_frame.values)])
     runtime_frame = runtime_frame.replace(0, min_val)
     assert(np.array_equal(scoring_frame.columns.values, runtime_frame.columns.values))
     assert(np.array_equal(scoring_frame.shape, runtime_frame.shape))
+    runtime_frame = runtime_frame ** (1/a3r_r)
     return scoring_frame / runtime_frame

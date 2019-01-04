@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--normalize_base', type=str, default=None)
     parser.add_argument('--normalize_a3r', type=str, default='StandardScaler')
+    parser.add_argument('--a3r_r', type=int, default=1)
     parser.add_argument('--aggregate', type=str, choices=AGGREGATES.keys(), default='sum')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
@@ -98,7 +99,8 @@ def run_on_task(task_id, args):
         config_frame_te[measure] = frame_te
     # adds A3R frame
     config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[args.scoring],
-                                                                 config_frame_tr[usercpu_time])
+                                                                 config_frame_tr[usercpu_time],
+                                                                 args.a3r_r)
 
     config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r], args.normalize_a3r)
 
@@ -107,7 +109,7 @@ def run_on_task(task_id, args):
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
-        result_directory = os.path.join(args.output_directory, str(task_id), strategy, args.aggregate, str(args.normalize_base), str(args.normalize_a3r))
+        result_directory = os.path.join(args.output_directory, str(task_id), strategy, args.aggregate, str(args.a3r_r), str(args.normalize_base), str(args.normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (args.n_defaults, minimize))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (args.n_defaults, minimize))

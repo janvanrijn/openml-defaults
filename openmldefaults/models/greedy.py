@@ -10,7 +10,9 @@ class GreedyDefaults(object):
     def __init__(self):
         self.name = 'greedy'
 
-    def generate_defaults(self, df: pd.DataFrame, num_defaults: int, minimize: bool, aggregate: typing.Callable):
+    def generate_defaults(self, df: pd.DataFrame, num_defaults: int,
+                          minimize: bool, aggregate: typing.Callable,
+                          raise_no_improvement: bool):
         """
         Takes a data frame and returns the greedy defaults. The data frame
         should be structured as follows: each column represents a task, each row
@@ -31,6 +33,10 @@ class GreedyDefaults(object):
 
         aggregate: callable
             function to aggregate per task results
+
+        raise_no_improvement: bool
+            if true, an error will be raised if no improvement is obtained
+            before the correct number of default was obtained
 
         Returns
         -------
@@ -60,9 +66,12 @@ class GreedyDefaults(object):
                     best_addition = current_config
                     best_index = idx
             if best_addition is None:
-                raise ValueError('Could not add default, as there were no '
-                                 'configurations that yield improvement after '
-                                 '%d defaults' % len(selected_configs))
+                if raise_no_improvement:
+                    raise ValueError('Could not add default, as there were no '
+                                     'configurations that yield improvement after '
+                                     '%d defaults' % len(selected_configs))
+                else:
+                    break
             selected_configs.append(best_addition)
             selected_indices.append(best_index)
 
