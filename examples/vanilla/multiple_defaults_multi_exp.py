@@ -30,11 +30,20 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
+    normalize_bases = [None, 'MinMaxScaler', 'StandardScaler']
+    normalize_a3rs = [None, 'MinMaxScaler', 'StandardScaler']
+    a3r_rs = [1, 2, 3, 4]
+    aggregates = ['sum', 'median']
+    total_experiments = len(normalize_bases) * len(normalize_a3rs) * len(a3r_rs) * len(aggregates)
+
     study = openml.study.get_study(args.study_id, 'tasks')
-    for normalize_base in [None, 'MinMaxScaler', 'StandardScaler']:
-        for normalize_a3r in [None, 'MinMaxScaler', 'StandardScaler']:
-            for a3r_r in [1, 2, 3, 4]:
-                for aggregate in ['sum', 'median']:
+    exp_index = 0  # just for logging
+    for normalize_base in normalize_bases:
+        for normalize_a3r in normalize_a3rs:
+            for a3r_r in a3r_rs:
+                for aggregate in aggregates:
+                    exp_index += 1
+                    logging.info('starting experiment %s %s %s %s (%d/%d)' % (normalize_base, normalize_a3r, a3r_r, aggregate, exp_index, total_experiments))
                     if args.task_idx is None:
                         for task_idx in range(len(study.tasks)):
                             task_id = study.tasks[task_idx]
