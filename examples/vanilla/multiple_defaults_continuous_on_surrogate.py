@@ -38,26 +38,11 @@ def run(args):
 
     study = openml.study.get_study(args.study_id, 'tasks')
     if args.task_idx is None:
-        for task_idx in range(len(study.tasks)):
-            task_id = study.tasks[task_idx]
-            openmldefaults.experiments.run_vanilla_surrogates_on_task(
-                task_id=task_id,
-                classifier_name=args.classifier_name,
-                random_seed=args.random_seed,
-                search_space_identifier=args.search_space_identifier,
-                metadata_file=args.metadata_file,
-                resized_grid_size=args.resized_grid_size,
-                scoring=args.scoring,
-                minimize=args.minimize,
-                n_defaults=args.n_defaults,
-                aggregate=args.aggregate,
-                a3r_r=args.a3r_r,
-                normalize_base=args.normalize_base,
-                normalize_a3r=args.normalize_a3r,
-                task_limit=args.task_limit,
-                output_directory=args.output_directory)
+        all_task_ids = study.tasks
     else:
-        task_id = study.tasks[args.task_idx]
+        all_task_ids = [study.tasks[args.task_idx]]
+
+    for task_id in all_task_ids:
         openmldefaults.experiments.run_vanilla_surrogates_on_task(
             task_id=task_id,
             classifier_name=args.classifier_name,

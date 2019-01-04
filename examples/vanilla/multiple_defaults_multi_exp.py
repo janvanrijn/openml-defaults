@@ -37,6 +37,11 @@ def run(args):
     total_experiments = len(normalize_bases) * len(normalize_a3rs) * len(a3r_rs) * len(aggregates)
 
     study = openml.study.get_study(args.study_id, 'tasks')
+    if args.task_idx is None:
+        all_task_ids = study.tasks
+    else:
+        all_task_ids = [study.tasks[args.task_idx]]
+
     exp_index = 0  # just for logging
     for normalize_base in normalize_bases:
         for normalize_a3r in normalize_a3rs:
@@ -44,27 +49,8 @@ def run(args):
                 for aggregate in aggregates:
                     exp_index += 1
                     logging.info('starting experiment %s %s %s %s (%d/%d)' % (normalize_base, normalize_a3r, a3r_r, aggregate, exp_index, total_experiments))
-                    if args.task_idx is None:
-                        for task_idx in range(len(study.tasks)):
-                            task_id = study.tasks[task_idx]
-                            openmldefaults.experiments.run_vanilla_surrogates_on_task(
-                                task_id=task_id,
-                                classifier_name=args.classifier_name,
-                                random_seed=args.random_seed,
-                                search_space_identifier=args.search_space_identifier,
-                                metadata_file=args.metadata_file,
-                                resized_grid_size=args.resized_grid_size,
-                                scoring=args.scoring,
-                                minimize=args.minimize,
-                                n_defaults=args.n_defaults,
-                                aggregate=aggregate,
-                                a3r_r=a3r_r,
-                                normalize_base=normalize_base,
-                                normalize_a3r=normalize_a3r,
-                                task_limit=args.task_limit,
-                                output_directory=args.output_directory)
-                    else:
-                        task_id = study.tasks[args.task_idx]
+
+                    for task_id in all_task_ids:
                         openmldefaults.experiments.run_vanilla_surrogates_on_task(
                             task_id=task_id,
                             classifier_name=args.classifier_name,
