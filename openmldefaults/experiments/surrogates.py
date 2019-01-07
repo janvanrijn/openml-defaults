@@ -82,7 +82,8 @@ def run_vanilla_surrogates_on_task(task_id, classifier_name, random_seed, search
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
-        result_directory = os.path.join(output_directory, str(task_id), strategy, aggregate, str(a3r_r), str(normalize_base), str(normalize_a3r))
+        result_directory = os.path.join(output_directory, classifier_name, str(task_id), strategy, aggregate,
+                                        str(a3r_r), str(normalize_base), str(normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize))
