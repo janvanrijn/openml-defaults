@@ -1,5 +1,7 @@
 import argparse
+import numpy as np
 import matplotlib.pyplot as plt
+import logging
 import seaborn as sns
 import openmldefaults
 import os
@@ -23,6 +25,21 @@ def filter_frame(df: pd.DataFrame, filters: typing.Dict):
     return df
 
 
+def check_budget_curves(df, values_column):
+    results_pivot = df.pivot_table(
+        values=values_column,
+        index=['folder_depth_0', 'folder_depth_1', 'folder_depth_2',
+               'folder_depth_3', 'folder_depth_4', 'folder_depth_5'],
+        columns='budget',
+        aggfunc=np.mean)
+    for index, row in results_pivot.iterrows():
+        last_value = 0.0
+        for column, value in row.iteritems():
+            if value < last_value:
+                logging.warning('Series not strictly improving at budget %d for %s' % (column, index))
+            last_value = value
+
+
 def run(args):
     usercpu_time = 'usercpu_time_millis'
     result_total = None
@@ -40,8 +57,8 @@ def run(args):
                                                                        budget,
                                                                        folder_constraints,
                                                                        False)
-        print(result_budget.shape)
         result_budget['budget'] = budget
+        print(result_budget.shape)
         if result_total is None:
             result_total = result_budget
         else:
@@ -49,6 +66,10 @@ def run(args):
 
     result_total[args.scoring] = result_total[args.scoring].astype(float)
     result_total[usercpu_time] = result_total[usercpu_time].astype(float)
+
+    # sanity check results
+    check_budget_curves(result_total, args.scoring)
+    check_budget_curves(result_total, usercpu_time)
 
     output_directory_full = os.path.join(args.output_directory, args.classifier_name)
     os.makedirs(output_directory_full, exist_ok=True)

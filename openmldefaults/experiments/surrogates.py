@@ -16,7 +16,7 @@ AGGREGATES = {
 
 
 def run_vanilla_surrogates_on_task(task_id, classifier_name, random_seed, search_space_identifier, metadata_file, resized_grid_size,
-                                   scoring, minimize, n_defaults, aggregate, a3r_r, normalize_base, normalize_a3r, task_limit,
+                                   scoring, minimize_measure, n_defaults, aggregate, a3r_r, normalize_base, normalize_a3r, task_limit,
                                    output_directory):
     logging.info('Starting on Task %d' % task_id)
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
@@ -78,7 +78,7 @@ def run_vanilla_surrogates_on_task(task_id, classifier_name, random_seed, search
     config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r], normalize_a3r)
 
     # whether to optimize scoring is parameterized, same for a3r (which follows from scoring). runtime always min
-    for measure, minimize in [(scoring, minimize), (usercpu_time, True), (a3r, minimize)]:
+    for measure, minimize in [(scoring, minimize_measure), (usercpu_time, True), (a3r, minimize_measure)]:
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
@@ -104,7 +104,9 @@ def run_vanilla_surrogates_on_task(task_id, classifier_name, random_seed, search
             for idx, default in zip(result['indices'], result['defaults']):
                 current_score = config_frame_te[scoring].iloc[idx]['task_%d' % task_id]
                 current_time = config_frame_te[usercpu_time].iloc[idx]['task_%d' % task_id]
-                if minimize:
+                # Note that this is not the same as `minimize'. E.g., when generating sets of defaults while minimizing
+                # runtime, we still want to select the best default based on the criterion of the original measure
+                if minimize_measure:
                     best_score = min(best_score, current_score)
                 else:
                     best_score = max(best_score, current_score)

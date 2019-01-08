@@ -1,5 +1,5 @@
-from . import svc
 from . import gradient_boosting
+from . import svc
 
 import openmldefaults
 import sklearnbot
