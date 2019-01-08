@@ -59,7 +59,7 @@ def run(args):
                             metadata_file=args.metadata_file,
                             resized_grid_size=args.resized_grid_size,
                             scoring=args.scoring,
-                            minimize=args.minimize,
+                            minimize_measure=args.minimize,
                             n_defaults=args.n_defaults,
                             aggregate=aggregate,
                             a3r_r=a3r_r,
