@@ -94,7 +94,7 @@ def run_vanilla_surrogates_on_task(task_id, classifier_name, random_seed, search
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
 
         with open(result_filepath_results, 'w') as csvfile:
-            best_score = 1.0 if minimize else 0.0
+            best_score = 1.0 if minimize_measure else 0.0
             total_time = 0.0
 
             fieldnames = [usercpu_time, scoring]
