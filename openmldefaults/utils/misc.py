@@ -79,12 +79,15 @@ def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
         with open(os.path.join(folder, current_path), 'r') as fp:
             reader = csv.DictReader(fp)
             row = next(reader)  # if budget were to be zero
+            n_defaults = 0
             for _ in range(budget):
                 try:
                     row = next(reader)
+                    n_defaults += 1
                 except StopIteration as e:
                     if raise_if_not_enough:
                         raise e
             current.update(row)
+            current['n_defaults'] = n_defaults
         results.append(current)
     return pd.DataFrame(results)

@@ -19,13 +19,17 @@ def parse_args():
     return parser.parse_args()
 
 
+# for sanity checking
+EXPECTED_RESUTLS = 297
+
+
 def filter_frame(df: pd.DataFrame, filters: typing.Dict):
     for filter_key, filter_value in filters.items():
         df = df.loc[df[filter_key] == filter_value]
     return df
 
 
-def check_budget_curves(df, values_column):
+def check_budget_curves(df: pd.DataFrame, values_column: str):
     results_pivot = df.pivot_table(
         values=values_column,
         index=['folder_depth_0', 'folder_depth_1', 'folder_depth_2',
@@ -40,12 +44,35 @@ def check_budget_curves(df, values_column):
             last_value = value
 
 
+def make_difference_df(df: pd.DataFrame, keys: typing.List, difference_field: str):
+    result = None
+    difference_vals = df[difference_field].unique()
+    df = df.set_index(keys)
+
+    for i in range(len(difference_vals)-1):
+        for j in range(i+1, len(difference_vals)):
+            df_a = df.loc[df[difference_field] == difference_vals[i]]
+            df_b = df.loc[df[difference_field] == difference_vals[j]]
+            del df_a[difference_field]
+            del df_b[difference_field]
+            if df_a.shape != df_b.shape:
+                raise ValueError()
+            difference_frame = df_a - df_b
+            difference_frame['strategies'] = '%s-%s' % (difference_vals[i], difference_vals[j])
+            if result is None:
+                result = difference_frame
+            else:
+                result = result.append(difference_frame)
+    result = result.reset_index()
+    return result
+
+
 def run(args):
     usercpu_time = 'usercpu_time_millis'
     result_total = None
     folder_constraints = {
         2: ['sum'],
-        3: ['1'],
+        3: ['2'],
         4: ['None'],
         5: ['None']
     }
@@ -58,7 +85,8 @@ def run(args):
                                                                        folder_constraints,
                                                                        False)
         result_budget['budget'] = budget
-        print(result_budget.shape)
+        if result_budget.shape[0] < EXPECTED_RESUTLS:
+            raise ValueError('Not enough results! Expected %d, got %d' % (EXPECTED_RESUTLS, result_budget.shape[0]))
         if result_total is None:
             result_total = result_budget
         else:
@@ -92,10 +120,25 @@ def run(args):
                     if len(filtered_frame) == 0:
                         continue
 
-                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+                    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(24, 12))
+
+                    # absolute plots
                     sns.boxplot(x="budget", y=args.scoring, hue="folder_depth_1", data=filtered_frame, ax=ax1)
                     sns.boxplot(x="budget", y=usercpu_time, hue="folder_depth_1", data=filtered_frame, ax=ax2)
                     ax2.set(yscale="log")
+                    sns.boxplot(x="budget", y='n_defaults', hue="folder_depth_1", data=filtered_frame, ax=ax3)
+
+                    # difference plots
+                    difference_plot = make_difference_df(filtered_frame,
+                                                         ['folder_depth_0', 'folder_depth_2', 'folder_depth_3',
+                                                          'folder_depth_4', 'folder_depth_5', 'budget'],
+                                                         'folder_depth_1')
+
+                    sns.boxplot(x="budget", y=args.scoring, hue="strategies", data=difference_plot, ax=ax4)
+                    sns.boxplot(x="budget", y=usercpu_time, hue="strategies", data=difference_plot, ax=ax5)
+                    ax5.set(yscale="log")
+                    sns.boxplot(x="budget", y='n_defaults', hue="strategies", data=difference_plot, ax=ax6)
+
                     plt.title(title)
                     plt.savefig(os.path.join(output_directory_full, '%s.png' % title))
 
