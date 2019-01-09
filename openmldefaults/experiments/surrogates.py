@@ -15,9 +15,13 @@ AGGREGATES = {
 }
 
 
-def run_vanilla_surrogates_on_task(task_id, classifier_name, random_seed, search_space_identifier, metadata_file, resized_grid_size,
-                                   scoring, minimize_measure, n_defaults, aggregate, a3r_r, normalize_base, normalize_a3r, task_limit,
-                                   output_directory):
+def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_seed: int, search_space_identifier: str,
+                                   metadata_file: str, resized_grid_size: int, scoring: str, minimize_measure: bool,
+                                   n_defaults: int, aggregate: str, a3r_r: int, normalize_base: str, normalize_a3r: str,
+                                   task_limit: int, output_directory: str):
+    if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
+        raise ValueError('Incompatible experiment parameters.')
+    
     logging.info('Starting on Task %d' % task_id)
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
     metadata_file_to_frame = memory.cache(openmldefaults.utils.metadata_file_to_frame)

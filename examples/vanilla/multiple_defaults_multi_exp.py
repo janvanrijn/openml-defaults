@@ -48,7 +48,19 @@ def run(args):
             for a3r_r in a3r_rs:
                 for aggregate in aggregates:
                     exp_index += 1
-                    logging.info('starting experiment %s %s %s %s (%d/%d)' % (normalize_base, normalize_a3r, a3r_r, aggregate, exp_index, total_experiments))
+                    if a3r_r > 1 and normalize_base == 'StandardScaler':
+                        logging.info('skipping experiment %s %s %s %s - incompatible (%d/%d)' % (normalize_base,
+                                                                                                 normalize_a3r,
+                                                                                                 a3r_r, aggregate,
+                                                                                                 exp_index,
+                                                                                                 total_experiments))
+                        continue
+                    logging.info('starting experiment %s %s %s %s (%d/%d)' % (normalize_base,
+                                                                              normalize_a3r,
+                                                                              a3r_r,
+                                                                              aggregate,
+                                                                              exp_index,
+                                                                              total_experiments))
 
                     for task_id in all_task_ids:
                         openmldefaults.experiments.run_vanilla_surrogates_on_task(
