@@ -20,7 +20,9 @@ def parse_args():
 
 
 # for sanity checking
-EXPECTED_RESUTLS = 297
+EXPECTED_DATASETS = 99
+EXPECTED_STRATEGIES = 3
+ALL_BUDGETS = [1, 2, 4, 8, 16, 32]
 
 
 def filter_frame(df: pd.DataFrame, filters: typing.Dict):
@@ -67,6 +69,28 @@ def make_difference_df(df: pd.DataFrame, keys: typing.List, difference_field: st
     return result
 
 
+def make_time_curves(df, indices, x_axis_column, y_axis_column):
+    df = df.pivot_table(
+        values=y_axis_column,
+        index=indices,
+        columns=x_axis_column,
+        aggfunc=np.mean)
+    previous_column = None
+
+    # check whether columns are correctly ordered
+    for idx, column in enumerate(df.columns.values):
+        column = float(column)
+        if previous_column is not None:
+            if column <= previous_column:
+                raise ValueError('Column idx %d value %f, previous %f' % (idx, column, previous_column))
+        previous_column = column
+    # check first column no NA's
+    assert df[df.columns[0]].isna().sum() == 0, 'First column should not contain any NA\'s'
+    df = df.fillna(method='ffill', axis=1)
+    assert sum(df.isna().sum()) == 0, 'Got %d NA\'s' % sum(df.isna().sum())
+    return df
+
+
 def run(args):
     usercpu_time = 'usercpu_time_millis'
     result_total = None
@@ -78,15 +102,17 @@ def run(args):
     }
     # folder_constraints = None
     results_directory = os.path.join(args.results_directory, args.classifier_name)
-    for budget in [1, 2, 4, 8, 16, 32]:
-        result_budget = openmldefaults.utils.results_from_folder_to_df(results_directory,
-                                                                       args.n_defaults_in_file,
-                                                                       budget,
-                                                                       folder_constraints,
-                                                                       False)
+    result_curves = None
+    for budget in ALL_BUDGETS:
+        result_budget, result_curves = openmldefaults.utils.results_from_folder_to_df(results_directory,
+                                                                                      args.n_defaults_in_file,
+                                                                                      budget,
+                                                                                      folder_constraints,
+                                                                                      False)
         result_budget['budget'] = budget
-        if result_budget.shape[0] < EXPECTED_RESUTLS:
-            raise ValueError('Not enough results! Expected %d, got %d' % (EXPECTED_RESUTLS, result_budget.shape[0]))
+        if result_budget.shape[0] < EXPECTED_DATASETS * EXPECTED_STRATEGIES:
+            raise ValueError('Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_STRATEGIES,
+                                                                                   result_budget.shape[0]))
         if result_total is None:
             result_total = result_budget
         else:
@@ -94,6 +120,8 @@ def run(args):
 
     result_total[args.scoring] = result_total[args.scoring].astype(float)
     result_total[usercpu_time] = result_total[usercpu_time].astype(float)
+    result_curves[args.scoring] = result_curves[args.scoring].astype(float)
+    result_curves[usercpu_time] = result_curves[usercpu_time].astype(float)
 
     # sanity check results
     check_budget_curves(result_total, args.scoring)
@@ -116,28 +144,45 @@ def run(args):
                                                                                              normalize_a3r,
                                                                                              a3r_r,
                                                                                              aggregate)
-                    filtered_frame = filter_frame(result_total, filters)
-                    if len(filtered_frame) == 0:
-                        continue
+                    filtered_results = filter_frame(result_total, filters)
+                    filtered_curves = filter_frame(result_curves, filters)
 
-                    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(24, 12))
+                    expected_rows_results = EXPECTED_DATASETS * EXPECTED_STRATEGIES * len(ALL_BUDGETS)
+                    expected_rows_curves = EXPECTED_DATASETS * EXPECTED_STRATEGIES * (ALL_BUDGETS[-1] + 1)
+                    if filtered_results.shape[0] != expected_rows_results:
+                        logging.warning('Unexpected results df shape. Expected %d rows, got %d rows' % (expected_rows_results,
+                                                                                                        filtered_results.shape[0]))
+                        continue
+                    if filtered_curves.shape[0] != expected_rows_curves:
+                        logging.warning('Unexpected curve df shape. Expected %d rows, got %d rows' % (expected_rows_curves,
+                                                                                                      filtered_curves.shape[0]))
+                        continue
+                    time_curves = make_time_curves(filtered_curves, ['folder_depth_0', 'folder_depth_1'], usercpu_time, args.scoring)
+                    time_curves = time_curves.reset_index()
+                    del time_curves['folder_depth_0']
+                    print(time_curves.groupby('folder_depth_1').mean().T)
+
+                    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, _, _)) = plt.subplots(3, 3, figsize=(24, 18))
 
                     # absolute plots
-                    sns.boxplot(x="budget", y=args.scoring, hue="folder_depth_1", data=filtered_frame, ax=ax1)
-                    sns.boxplot(x="budget", y=usercpu_time, hue="folder_depth_1", data=filtered_frame, ax=ax2)
+                    sns.boxplot(x="budget", y=args.scoring, hue="folder_depth_1", data=filtered_results, ax=ax1)
+                    sns.boxplot(x="budget", y=usercpu_time, hue="folder_depth_1", data=filtered_results, ax=ax2)
                     ax2.set(yscale="log")
-                    sns.boxplot(x="budget", y='n_defaults', hue="folder_depth_1", data=filtered_frame, ax=ax3)
+                    sns.boxplot(x="budget", y='n_defaults', hue="folder_depth_1", data=filtered_results, ax=ax3)
 
                     # difference plots
-                    difference_plot = make_difference_df(filtered_frame,
-                                                         ['folder_depth_0', 'folder_depth_2', 'folder_depth_3',
-                                                          'folder_depth_4', 'folder_depth_5', 'budget'],
-                                                         'folder_depth_1')
+                    results_difference = make_difference_df(filtered_results,
+                                                            ['folder_depth_0', 'folder_depth_2', 'folder_depth_3',
+                                                             'folder_depth_4', 'folder_depth_5', 'budget'],
+                                                            'folder_depth_1')
 
-                    sns.boxplot(x="budget", y=args.scoring, hue="strategies", data=difference_plot, ax=ax4)
-                    sns.boxplot(x="budget", y=usercpu_time, hue="strategies", data=difference_plot, ax=ax5)
+                    sns.boxplot(x="budget", y=args.scoring, hue="strategies", data=results_difference, ax=ax4)
+                    sns.boxplot(x="budget", y=usercpu_time, hue="strategies", data=results_difference, ax=ax5)
                     ax5.set(yscale="log")
-                    sns.boxplot(x="budget", y='n_defaults', hue="strategies", data=difference_plot, ax=ax6)
+                    sns.boxplot(x="budget", y='n_defaults', hue="strategies", data=results_difference, ax=ax6)
+
+                    sns.lineplot(x=usercpu_time, y=args.scoring,
+                                 hue="folder_depth_1", data=filtered_curves, ax=ax7)
 
                     plt.title(title)
                     plt.savefig(os.path.join(output_directory_full, '%s.png' % title))

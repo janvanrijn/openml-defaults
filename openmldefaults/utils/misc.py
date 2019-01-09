@@ -44,7 +44,7 @@ def _traverse_run_folders(folder: str, n_defaults: int, traversed_directories: t
 def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
                               constraints: typing.Optional[typing.Dict[int, typing.List[str]]],
                               raise_if_not_enough: bool) \
-        -> pd.DataFrame:
+        -> typing.Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Traverses all subdirecties, and obtains stored runs with evaluation scores.
 
@@ -68,26 +68,37 @@ def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
 
     Returns
     -------
-    df : pd.DataFrame
+    pd.DataFrame
         a data frame with columns for each folder level and the metric_fn as y
+    pd.DataFrame
+        a data frame with columns for each folder level and the loss curve (in a
+        single cell)
     """
     list_dirs_runs = _traverse_run_folders(folder, n_defaults_in_file, list(), constraints)
-    results = []
+    results_vanilla = []
+    results_curves = []
     for dirs in list_dirs_runs:
-        current = {'folder_depth_%d' % idx: folder for idx, folder in enumerate(dirs[:-1])}
+        current_vanilla = {'folder_depth_%d' % idx: folder for idx, folder in enumerate(dirs[:-1])}
         current_path = '/'.join(dirs)
         with open(os.path.join(folder, current_path), 'r') as fp:
             reader = csv.DictReader(fp)
-            row = next(reader)  # if budget were to be zero
-            n_defaults = 0
-            for _ in range(budget):
-                try:
-                    row = next(reader)
-                    n_defaults += 1
-                except StopIteration as e:
-                    if raise_if_not_enough:
-                        raise e
-            current.update(row)
-            current['n_defaults'] = n_defaults
-        results.append(current)
-    return pd.DataFrame(results)
+            curve = list()
+            for idx, row in enumerate(reader):
+                if idx > budget:
+                    # only break if curve is bigger than budget (since the n-th
+                    # line represents the case of "budget" = n, in particular
+                    # line 0 represents budget = 0)
+                    break
+                curve.append(row)
+                current_curve_point = dict(current_vanilla)
+                current_curve_point.update(row)
+                results_curves.append(current_curve_point)
+        current_vanilla.update(curve[-1])
+        current_vanilla['n_defaults'] = len(curve) - 1  # same reason
+        if len(curve) - 1 > budget:
+            # Should never happen
+            raise ValueError()
+        if len(curve) - 1 < budget and raise_if_not_enough:
+            raise ValueError('Not enough curve points')
+        results_vanilla.append(current_vanilla)
+    return pd.DataFrame(results_vanilla), pd.DataFrame(results_curves)
