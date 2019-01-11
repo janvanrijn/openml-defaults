@@ -69,35 +69,35 @@ def make_difference_df(df: pd.DataFrame, keys: typing.List, difference_field: st
     return result
 
 
-def make_time_curves(df, indices, x_axis_column, y_axis_column):
-    df = df.pivot_table(
-        values=y_axis_column,
-        index=indices,
-        columns=x_axis_column,
-        aggfunc=np.mean)
-    previous_column = None
-
-    # check whether columns are correctly ordered
-    for idx, column in enumerate(df.columns.values):
-        column = float(column)
-        if previous_column is not None:
-            if column <= previous_column:
-                raise ValueError('Column idx %d value %f, previous %f' % (idx, column, previous_column))
-        previous_column = column
-    # check first column no NA's
-    assert df[df.columns[0]].isna().sum() == 0, 'First column should not contain any NA\'s'
-    df = df.fillna(method='ffill', axis=1)
-    assert sum(df.isna().sum()) == 0, 'Got %d NA\'s' % sum(df.isna().sum())
-    return df
+# def make_time_curves(df, indices, x_axis_column, y_axis_column):
+#     df = df.pivot_table(
+#         values=y_axis_column,
+#         index=indices,
+#         columns=x_axis_column,
+#         aggfunc=np.mean)
+#     previous_column = None
+#
+#     # check whether columns are correctly ordered
+#     for idx, column in enumerate(df.columns.values):
+#         column = float(column)
+#         if previous_column is not None:
+#             if column <= previous_column:
+#                 raise ValueError('Column idx %d value %f, previous %f' % (idx, column, previous_column))
+#         previous_column = column
+#     # check first column no NA's
+#     assert df[df.columns[0]].isna().sum() == 0, 'First column should not contain any NA\'s'
+#     df = df.fillna(method='ffill', axis=1)
+#     assert sum(df.isna().sum()) == 0, 'Got %d NA\'s' % sum(df.isna().sum())
+#     return df
 
 
 def run(args):
     usercpu_time = 'usercpu_time_millis'
     result_total = None
     folder_constraints = {
-        2: ['sum'],
-        3: ['2'],
-        4: ['None'],
+        2: ['median'],
+        3: ['1'],
+        4: ['MinMaxScaler'],
         5: ['None']
     }
     # folder_constraints = None
@@ -146,6 +146,7 @@ def run(args):
                                                                                              aggregate)
                     filtered_results = filter_frame(result_total, filters)
                     filtered_curves = filter_frame(result_curves, filters)
+                    strategies = filtered_results['folder_depth_1'].unique()
 
                     expected_rows_results = EXPECTED_DATASETS * EXPECTED_STRATEGIES * len(ALL_BUDGETS)
                     expected_rows_curves = EXPECTED_DATASETS * EXPECTED_STRATEGIES * (ALL_BUDGETS[-1] + 1)
@@ -157,12 +158,11 @@ def run(args):
                         logging.warning('Unexpected curve df shape. Expected %d rows, got %d rows' % (expected_rows_curves,
                                                                                                       filtered_curves.shape[0]))
                         continue
-                    time_curves = make_time_curves(filtered_curves, ['folder_depth_0', 'folder_depth_1'], usercpu_time, args.scoring)
-                    time_curves = time_curves.reset_index()
-                    del time_curves['folder_depth_0']
-                    print(time_curves.groupby('folder_depth_1').mean().T)
+                    # time_curves = make_time_curves(filtered_curves, ['folder_depth_0', 'folder_depth_1'], usercpu_time, args.scoring)
+                    # time_curves = time_curves.reset_index()
+                    # del time_curves['folder_depth_0']
 
-                    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, _, _)) = plt.subplots(3, 3, figsize=(24, 18))
+                    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(24, 12))
 
                     # absolute plots
                     sns.boxplot(x="budget", y=args.scoring, hue="folder_depth_1", data=filtered_results, ax=ax1)
@@ -181,11 +181,45 @@ def run(args):
                     ax5.set(yscale="log")
                     sns.boxplot(x="budget", y='n_defaults', hue="strategies", data=results_difference, ax=ax6)
 
-                    sns.lineplot(x=usercpu_time, y=args.scoring,
-                                 hue="folder_depth_1", data=filtered_curves, ax=ax7)
-
                     plt.title(title)
-                    plt.savefig(os.path.join(output_directory_full, '%s.png' % title))
+                    plt.savefig(os.path.join(output_directory_full, '%s_agg.png' % title))
+
+                    # plot individual loss curves
+                    rows = 10
+                    cols = 10
+                    fig, axes = plt.subplots(rows, cols, figsize=(24, 12))
+                    task_ids = result_curves['folder_depth_0'].unique()
+                    win_counts = list()
+                    for idx, task_id in enumerate(task_ids):
+                        current_task = result_curves.loc[result_curves['folder_depth_0'] == task_id]
+                        if len(current_task) == 0:
+                            # in case no results on a task
+                            continue
+                        legend = 'brief' if idx == 0 else None
+                        sns.lineplot(x=usercpu_time, y=args.scoring, markers=True,
+                                     hue="folder_depth_1", data=current_task,
+                                     ax=axes[idx % cols, int(idx / cols)], legend=legend)
+
+                        for strategy in strategies:
+                            time_threshold = current_task[current_task['folder_depth_1'] == strategy][usercpu_time].max()
+                            current_task_threshold = current_task.loc[current_task[usercpu_time] <= time_threshold]
+                            result = current_task_threshold.groupby('folder_depth_1')['predictive_accuracy'].max()
+                            for idx_a, strategy_a in enumerate(strategies):
+                                for idx_b, strategy_b in enumerate(strategies):
+                                    if idx_a >= idx_b:
+                                        continue
+                                    current = {
+                                        'strategy_a': strategy_a,
+                                        'strategy_b': strategy_b,
+                                        'task_id': task_id,
+                                        'threshold_base': strategy,
+                                        'a_better': result[strategy_a] > result[strategy_b]
+                                    }
+                                    win_counts.append(current)
+                    win_counts = pd.DataFrame(win_counts)
+                    print(win_counts.groupby(['threshold_base', 'strategy_a', 'strategy_b'])['a_better'].sum())
+
+                    plt.savefig(os.path.join(output_directory_full, '%s_loss.png' % title), dpi=300)
 
 
 if __name__ == '__main__':

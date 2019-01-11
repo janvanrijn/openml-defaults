@@ -18,16 +18,17 @@ AGGREGATES = {
 def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_seed: int, search_space_identifier: str,
                                    metadata_file: str, resized_grid_size: int, scoring: str, minimize_measure: bool,
                                    n_defaults: int, aggregate: str, a3r_r: int, normalize_base: str, normalize_a3r: str,
-                                   task_limit: int, output_directory: str):
+                                   surrogate_n_estimators: int, surrogate_minimum_evals: int, task_limit: int,
+                                   output_directory: str):
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
     
     logging.info('Starting on Task %d' % task_id)
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
     metadata_file_to_frame = memory.cache(openmldefaults.utils.metadata_file_to_frame)
-    generate_grid_dataset = memory.cache(openmldefaults.utils.generate_grid_dataset)
+    generate_surrogates_using_metadata = memory.cache(openmldefaults.utils.generate_surrogates_using_metadata)
     model = openmldefaults.models.GreedyDefaults()
-    generate_defaults = memory.cache(model.generate_defaults)
+    generate_defaults_discretized = memory.cache(model.generate_defaults_discretized)
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
 
@@ -43,6 +44,8 @@ def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_se
     measures = [scoring, usercpu_time]
     metadata_frame = metadata_file_to_frame(metadata_file, config_space, measures)
 
+    # this ensures that we only take tasks on which a surrogate was trained
+    # (note that not all tasks do have meta-data, due to problems on OpenML)
     tasks_tr = list(metadata_frame['task_id'].unique())
     tasks_tr.remove(task_id)
     if task_limit:
@@ -54,25 +57,18 @@ def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_se
     config_frame_te = dict()
     for measure, normalize in [(scoring, normalize_base), (usercpu_time, normalize_base)]:
         logging.info('Generating frames for measure: %s' % measure)
-        frame_tr = generate_grid_dataset(metadata_frame,
-                                         configurations,
-                                         tasks_tr,
-                                         config_space,
-                                         measure,
-                                         normalize,
-                                         random_seed,
-                                         False,
-                                         -1)
+        surrogates = generate_surrogates_using_metadata(metadata_frame,
+                                                        configurations,
+                                                        config_space,
+                                                        measure,
+                                                        surrogate_minimum_evals,
+                                                        surrogate_n_estimators,
+                                                        random_seed)
+        frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
+            surrogates, tasks_tr, config_space, configurations, normalize, None, -1)
         config_frame_tr[measure] = frame_tr
-        frame_te = generate_grid_dataset(metadata_frame,
-                                         configurations,
-                                         tasks_te,
-                                         config_space,
-                                         measure,
-                                         None,
-                                         random_seed,
-                                         False,
-                                         -1)
+        frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
+            surrogates, tasks_te, config_space, configurations, normalize, None, -1)
         config_frame_te[measure] = frame_te
     # adds A3R frame
     config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[scoring],
@@ -92,7 +88,7 @@ def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_se
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize))
 
-        result = generate_defaults(config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], False)
+        result = generate_defaults_discretized(config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], False)
         with open(result_filepath_defaults, 'wb') as fp:
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)

@@ -26,6 +26,8 @@ def parse_args():
     parser.add_argument('--aggregate', type=str, choices=openmldefaults.experiments.AGGREGATES, default='sum')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
+    parser.add_argument('--n_estimators', type=int, default=64)
+    parser.add_argument('--minimum_evals', type=int, default=128)
     parser.add_argument('--random_seed', type=int, default=42)
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     args_ = parser.parse_args()
@@ -57,6 +59,8 @@ def run(args):
             a3r_r=args.a3r_r,
             normalize_base=args.normalize_base,
             normalize_a3r=args.normalize_a3r,
+            surrogate_n_estimators=args.n_estimators,
+            surrogate_minimum_evals=args.minimum_evals,
             task_limit=args.task_limit,
             output_directory=args.output_directory)
 

@@ -119,7 +119,9 @@ def train_surrogate_on_task(task_id: int,
         if column not in legal_columns:
             del setup_data[column]
     if set(setup_data.columns.values) != legal_columns:
-        raise ValueError('Columns for surrogate do not align with expectations')
+        missing = legal_columns - set(setup_data.columns.values)
+        over = set(setup_data.columns.values) - legal_columns
+        raise ValueError('Columns for surrogate do not align with expectations. Missing: %s, over: %s' % (missing, over))
 
     nominal_values_min = 10
     # obtain the data
@@ -175,15 +177,14 @@ def train_surrogate_on_task(task_id: int,
     return surrogate, setup_data.columns.values
 
 
-def generate_grid_dataset(metadata_frame: pd.DataFrame,
-                          configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
-                          task_ids: typing.List[int],
-                          config_space: ConfigSpace.ConfigurationSpace,
-                          scoring: str,
-                          scaler_type: typing.Optional[str],
-                          random_seed: int,
-                          prefix_with_scoring: bool,
-                          fill_nans: typing.Optional[float]) -> pd.DataFrame:
+def generate_dataset_using_surrogates(
+        surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
+        task_ids: typing.List[int],
+        config_space: ConfigSpace.ConfigurationSpace,
+        configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
+        scaler_type: typing.Optional[str],
+        column_prefix: typing.Optional[str],
+        fill_nans: typing.Optional[float]) -> pd.DataFrame:
     """
     Generates a data frame where each row represents a configuration, each column
     represents an openml task and each cell represents the scoring of that
@@ -191,25 +192,22 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
 
     Parameters
     ----------
-    metadata_frame: pd.Dataframe
-        A dataframe with columns for all hyperparameters, a column indicating the
-        task and a column indicating the scoring
+    surrogates: dict[str, RegressorMixin]
+        A dictionary mapping from task id to a surrogate
+    task_ids: list:
+        A list of tasks to include in the resulting frame (note that each
+        task must be a key in the surrogates dict, or an error will be thrown)
+    config_space: ConfigSpace.ConfigurationSpace
+        Determines which hyperparameters are relevant
     configurations: List[Dict[str, mixed]]
         A list of dicts, each dict mapping from hyperparameter name to
         hyperparameter value
-    task_ids: List[int]
-        The task ids to consider
-    config_space: ConfigSpace.ConfigurationSpace
-        Determines which hyperparameters are relevant
-    scoring: str
-        The optimization criterion. Should be a column of meta-data frame
     scaler_type: str (optional)
-        Whether to normalize the resulting frame (column-wise)
-    random_seed: int
-        A random seed, used for the surrogate model
-    prefix_with_scoring: bool
-        If set to true, the resulting frame will have column names with the
-        scoring prefixed in the name (verbosity, expandability)
+        Which scalar to use for the resulting data frame (see function:
+        openmldefaults.utils.get_scaler)
+    column_prefix: str
+        If set, the resulting frame will have column names prefixed with the
+        with this value (verbosity, expandability)
     fill_nans: float, optional
         Fills nans in the resulting frame with this value. Nans will only occur
         in hyperparameter values
@@ -230,33 +228,14 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
     # copy of df_orig. Prevent copy function for correct type hints
     df_surrogate = pd.DataFrame(configurations)
     for task_id in task_ids:
-        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
-        if len(setup_frame) == 0:
-            raise ValueError('Did not find any configurations for task %d' % task_id)
-
-        del setup_frame['task_id']
-        try:
-            estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
-                                                                              config_space,
-                                                                              setup_frame,
-                                                                              scoring,
-                                                                              False,  # we will normalize predictions
-                                                                              64,
-                                                                              random_seed)
-        except ValueError as e:
-            print('Error at task %d: %s' % (task_id, e))
-            continue
-        if not np.array_equal(df_orig.columns.values, columns):
-            # if this goes wrong, it is due to the pd.get_dummies() fn
-            raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
-        surrogate_values = estimator.predict(df_orig.values)
+        surrogate_values = surrogates[task_id].predict(df_orig.values)
         if scaler_type is not None:
-            logging.info('scaling %s dataframe using %s' % (scoring, scaler_type))
+            logging.info('scaling dataframe using %s' % scaler_type)
             scaler = openmldefaults.utils.get_scaler(scaler_type)
             surrogate_values = scaler.fit_transform(surrogate_values.reshape(-1, 1))[:, 0]
         column_name = 'task_%d' % task_id
-        if prefix_with_scoring:
-            column_name = '%s_task_%d' % (scoring, task_id)
+        if column_prefix:
+            column_name = '%s_%s' % (column_prefix, column_name)
         df_surrogate[column_name] = surrogate_values
 
     if df_surrogate.shape[0] != len(configurations):
@@ -266,6 +245,67 @@ def generate_grid_dataset(metadata_frame: pd.DataFrame,
         df_surrogate = df_surrogate.fillna(fill_nans)
     df_surrogate = df_surrogate.set_index(config_space.get_hyperparameter_names())
     return df_surrogate
+
+
+def generate_surrogates_using_metadata(
+        metadata_frame: pd.DataFrame,
+        configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
+        config_space: ConfigSpace.ConfigurationSpace,
+        scoring: str,
+        minimum_evals: int,
+        n_estimators: int,
+        random_seed: int) -> typing.Dict[int, sklearn.pipeline.Pipeline]:
+    """
+    Generates a data frame where each row represents a configuration, each
+    column represents an openml task and each cell represents the scoring of
+    that configuration on that task.
+
+    Parameters
+    ----------
+    metadata_frame: pd.Dataframe
+        A dataframe with columns for all hyperparameters, a column indicating the
+        task and a column indicating the scoring
+    configurations: List[Dict[str, mixed]]
+        A list of dicts, each dict mapping from hyperparameter name to
+        hyperparameter value
+    config_space: ConfigSpace.ConfigurationSpace
+        Determines which hyperparameters are relevant
+    scoring: str
+        The optimization criterion. Should be a column of meta-data frame
+    minimum_evals: int
+        Minimum number of evaluations per task (or error will be thrown)
+    n_estimators: int
+        The number of trees in the random forest surrogates
+    random_seed: int
+        A random seed, used for the surrogate model
+
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe with all configurations set to the index, and all tasks as
+        columns.
+    """
+    surrogates = dict()
+    df_orig = pd.DataFrame(configurations)
+    task_ids = metadata_frame['task_id'].unique()
+    for task_id in task_ids:
+        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
+        if len(setup_frame) < minimum_evals:
+            raise ValueError('Not enough evaluations in meta-frame for task %d: %d' % (task_id, minimum_evals))
+
+        del setup_frame['task_id']
+        estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
+                                                                          config_space,
+                                                                          setup_frame,
+                                                                          scoring,
+                                                                          False,  # we will normalize predictions
+                                                                          n_estimators,
+                                                                          random_seed)
+        if not np.array_equal(df_orig.columns.values, columns):
+            # if this goes wrong, it is due to the pd.get_dummies() fn
+            raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
+        surrogates[task_id] = estimator
+    return surrogates
 
 
 def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.ConfigurationSpace, scoring: typing.List[str]) -> pd.DataFrame:
