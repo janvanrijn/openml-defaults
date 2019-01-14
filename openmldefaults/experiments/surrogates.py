@@ -5,6 +5,7 @@ import openmldefaults
 import os
 import pickle
 import statistics
+import typing
 
 
 AGGREGATES = {
@@ -15,34 +16,40 @@ AGGREGATES = {
 }
 
 
-def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_seed: int, search_space_identifier: str,
-                                   metadata_file: str, resized_grid_size: int, scoring: str, minimize_measure: bool,
-                                   n_defaults: int, aggregate: str, a3r_r: int, normalize_base: str, normalize_a3r: str,
-                                   surrogate_n_estimators: int, surrogate_minimum_evals: int, task_limit: int,
+def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str],
+                                   random_seed: int, search_space_identifier: str,
+                                   n_configurations: int,
+                                   scoring: str, minimize_measure: bool,
+                                   n_defaults: int, aggregate: str, a3r_r: int,
+                                   normalize_base: str, normalize_a3r: str,
+                                   surrogate_n_estimators: int,
+                                   surrogate_minimum_evals: int, task_limit: int,
                                    output_directory: str):
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
     
     logging.info('Starting on Task %d' % task_id)
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
-    metadata_file_to_frame = memory.cache(openmldefaults.utils.metadata_file_to_frame)
+    metadata_files_to_frame = memory.cache(openmldefaults.utils.metadata_files_to_frame)
     generate_surrogates_using_metadata = memory.cache(openmldefaults.utils.generate_surrogates_using_metadata)
     model = openmldefaults.models.GreedyDefaults()
     generate_defaults_discretized = memory.cache(model.generate_defaults_discretized)
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
+    classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
+    config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
+                                                                  random_seed,
+                                                                  search_space_identifier)
+    configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_configurations)]
 
-    config_space = openmldefaults.config_spaces.get_config_space(classifier_name,
-                                                                 random_seed,
-                                                                 search_space_identifier)
-
-    metadata_atts = openmldefaults.utils.get_dataset_metadata(metadata_file)
-    if scoring not in metadata_atts['measure']:
-        raise ValueError('Could not find measure: %s' % scoring)
-    if usercpu_time not in metadata_atts['measure']:
-        raise ValueError('Could not find measure: %s' % usercpu_time)
+    for metadata_file in metadata_files:
+        metadata_atts = openmldefaults.utils.get_dataset_metadata(metadata_file)
+        if scoring not in metadata_atts['measure']:
+            raise ValueError('Could not find measure: %s' % scoring)
+        if usercpu_time not in metadata_atts['measure']:
+            raise ValueError('Could not find measure: %s' % usercpu_time)
     measures = [scoring, usercpu_time]
-    metadata_frame = metadata_file_to_frame(metadata_file, config_space, measures)
+    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, measures)
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
@@ -52,11 +59,10 @@ def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_se
         tasks_tr = tasks_tr[:task_limit]
     tasks_te = [task_id]
 
-    configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, resized_grid_size)
     config_frame_tr = dict()
     config_frame_te = dict()
     for measure, normalize in [(scoring, normalize_base), (usercpu_time, normalize_base)]:
-        logging.info('Generating frames for measure: %s' % measure)
+        logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
         surrogates = generate_surrogates_using_metadata(metadata_frame,
                                                         configurations,
                                                         config_space,
@@ -82,7 +88,8 @@ def run_vanilla_surrogates_on_task(task_id: int, classifier_name: str, random_se
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
-        result_directory = os.path.join(output_directory, classifier_name, str(task_id), strategy, aggregate,
+        classifier_identifier = '__'.join(sorted(classifier_names))
+        result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy, aggregate,
                                         str(a3r_r), str(normalize_base), str(normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))

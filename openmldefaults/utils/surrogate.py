@@ -5,6 +5,7 @@ import math
 import numpy as np
 import openmlcontrib
 import openmldefaults
+import os
 import pandas as pd
 import sklearn
 import sklearn.ensemble
@@ -154,7 +155,7 @@ def train_surrogate_on_task(task_id: int,
 
     # TODO: HPO
     nominal_pipe = sklearn.pipeline.Pipeline(steps=[
-        ('imputer', sklearn.impute.SimpleImputer(strategy='constant', fill_value=-1)),
+        ('imputer', sklearn.impute.SimpleImputer(strategy='constant', fill_value='-1')),
         ('encoder', sklearn.preprocessing.OneHotEncoder())
     ])
 
@@ -163,7 +164,7 @@ def train_surrogate_on_task(task_id: int,
         nominal_indicators.append(col == object)
     nominal_indicators = np.array(nominal_indicators, dtype=bool)
     col_trans = sklearn.compose.ColumnTransformer(transformers=[
-        ('numeric', sklearn.impute.SimpleImputer(strategy='median'), ~nominal_indicators),
+        ('numeric', sklearn.impute.SimpleImputer(strategy='constant', fill_value=-1), ~nominal_indicators),
         ('nominal', nominal_pipe, nominal_indicators)
     ])
 
@@ -219,8 +220,9 @@ def generate_dataset_using_surrogates(
         columns.
     """
     for configuration in configurations:
-        if configuration.keys() != set(config_space.get_hyperparameter_names()):
-            raise ValueError('Configuration does not align with ConfigSpace')
+        illegal = set(configuration.keys()) - set(config_space.get_hyperparameter_names())
+        if len(illegal) > 0:
+            raise ValueError('Configuration contains illegal hyperparameters: %s' % illegal)
 
     df_orig = pd.DataFrame(configurations)
     logging.info('Meta-dataset dimensions: %s' % str(df_orig.shape))
@@ -308,42 +310,69 @@ def generate_surrogates_using_metadata(
     return surrogates
 
 
-def metadata_file_to_frame(metadata_file: str, config_space: ConfigSpace.ConfigurationSpace, scoring: typing.List[str]) -> pd.DataFrame:
+def metadata_files_to_frame(metadata_files: typing.List[str],
+                            search_space_identifier: str,
+                            scoring: typing.List[str]) -> pd.DataFrame:
     """
     Loads a meta-data set, as outputted by sklearn bot, and removes redundant
     columns and rows
     """
-    with open(metadata_file, 'r') as fp:
-        metadata_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
+    metadata_frame_total = None
+    for metadata_file in metadata_files:
+        with open(metadata_file, 'r') as fp:
+            classifier_name = os.path.splitext(os.path.basename(metadata_file))[0]
+            config_space = openmldefaults.config_spaces.get_config_space(classifier_name, 0, search_space_identifier)
+            metadata_frame_classif = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), config_space)
+            metadata_frame_classif['classifier'] = classifier_name
+            logging.info('Loaded %s meta-data data frame. Dimensions: %s' % (classifier_name,
+                                                                             str(metadata_frame_classif.shape)))
 
-    # TODO: modularize. Remove unnecessary columns
-    legal_column_names = config_space.get_hyperparameter_names() + scoring + ['task_id']
-    logging.info('Loaded Dimensions data frame: %s' % str(metadata_frame.shape))
-    for column_name in metadata_frame.columns.values:
-        if column_name not in legal_column_names:
-            logging.info('Removing column: %s' % column_name)
-            del metadata_frame[column_name]
+            # TODO: modularize. Remove unnecessary columns
+            legal_column_names = config_space.get_hyperparameter_names() + scoring + ['classifier', 'task_id']
+            for column_name in metadata_frame_classif.columns.values:
+                if column_name not in legal_column_names:
+                    logging.info('Removing column: %s' % column_name)
+                    del metadata_frame_classif[column_name]
 
-    # TODO: modularize. Remove unnecessary rows
-    to_drop_indices = []
-    for row_idx, row in metadata_frame.iterrows():
-        # conditionals can be nan. filter these out with notnull()
-        config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
-        del config['task_id']
-        for measure in scoring:
-            del config[measure]
+            # TODO: modularize. Remove unnecessary rows
+            to_drop_indices = []
+            for row_idx, row in metadata_frame_classif.iterrows():
+                # conditionals can be nan. filter these out with notnull()
+                config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
+                del config['task_id']
+                del config['classifier']
+                for measure in scoring:
+                    del config[measure]
+                try:
+                    ConfigSpace.Configuration(config_space, config)
+                except ValueError as e:
+                    logging.info('Dropping config, %s' % e)
+                    to_drop_indices.append(row_idx)
 
-        try:
-            ConfigSpace.Configuration(config_space, config)
-        except ValueError as e:
-            logging.info('Dropping config, %s' % e)
-            to_drop_indices.append(row_idx)
+            metadata_frame_classif = metadata_frame_classif.drop(to_drop_indices)
+            if metadata_frame_classif.shape[0] == 0:
+                raise ValueError()
+            logging.info('New Dimensions %s meta-data frame: %s' % (classifier_name,
+                                                                    str(metadata_frame_classif.shape)))
+            # add prefix to column names
+            metadata_frame_classif = metadata_frame_classif.rename(index=str, columns={
+                param: '%s:%s' % (classifier_name, param) for param in config_space.get_hyperparameter_names()
+            })
 
-    metadata_frame = metadata_frame.drop(to_drop_indices)
-    if metadata_frame.shape[0] == 0:
-        raise ValueError()
-    logging.info('New Dimensions data frame: %s' % str(metadata_frame.shape))
-    return metadata_frame
+            if metadata_frame_total is None:
+                metadata_frame_total = metadata_frame_classif
+            else:
+                # TODO: due to a bug in pandas, we need to manually cast columns to Int64.
+                # See: https://github.com/pandas-dev/pandas/issues/24768
+                int_columns = list(metadata_frame_classif.select_dtypes(include=['Int64']).columns) + \
+                              list(metadata_frame_total.select_dtypes(include=['Int64']).columns)
+                metadata_frame_total = metadata_frame_total.append(metadata_frame_classif)
+                for column in int_columns:
+                    metadata_frame_total[column] = metadata_frame_total[column].astype('Int64')
+
+    logging.info('Loaded %d meta-data data frames. Dimensions: %s' % (len(metadata_files),
+                                                                      str(metadata_frame_total.shape)))
+    return metadata_frame_total
 
 
 def single_prediction(df: pd.DataFrame,
