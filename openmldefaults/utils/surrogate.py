@@ -400,6 +400,7 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
     if not 'task_%d' % task_id in timing_frame.columns.values:
         raise ValueError()
 
+    os.makedirs(os.path.dirname(result_filepath_results), exist_ok=True)
     with open(result_filepath_results, 'w') as csvfile:
         best_score = 1.0 if minimize_measure else 0.0
         total_time = 0.0
