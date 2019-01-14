@@ -319,6 +319,12 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
     """
     metadata_frame_total = None
     for metadata_file in metadata_files:
+        # sanity checks
+        metadata_atts = openmldefaults.utils.get_dataset_metadata(metadata_file)
+        for measure in scoring:
+            if measure not in metadata_atts['measure']:
+                raise ValueError('Could not find mandatory measure %s in dataset: %s' % (scoring, metadata_file))
+        # open the file and extract the correct columns
         with open(metadata_file, 'r') as fp:
             classifier_name = os.path.splitext(os.path.basename(metadata_file))[0]
             config_space = openmldefaults.config_spaces.get_config_space(classifier_name, 0, search_space_identifier)

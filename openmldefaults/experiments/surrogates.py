@@ -29,31 +29,27 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         raise ValueError('Incompatible experiment parameters.')
     
     logging.info('Starting on Task %d' % task_id)
+    model = openmldefaults.models.GreedyDefaults()
+    usercpu_time = 'usercpu_time_millis'
+    a3r = 'a3r'
+
+    # joblib speed ups
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
     metadata_files_to_frame = memory.cache(openmldefaults.utils.metadata_files_to_frame)
     generate_surrogates_using_metadata = memory.cache(openmldefaults.utils.generate_surrogates_using_metadata)
-    model = openmldefaults.models.GreedyDefaults()
     generate_defaults_discretized = memory.cache(model.generate_defaults_discretized)
-    usercpu_time = 'usercpu_time_millis'
-    a3r = 'a3r'
+
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_configurations)]
-
-    for metadata_file in metadata_files:
-        metadata_atts = openmldefaults.utils.get_dataset_metadata(metadata_file)
-        if scoring not in metadata_atts['measure']:
-            raise ValueError('Could not find measure: %s' % scoring)
-        if usercpu_time not in metadata_atts['measure']:
-            raise ValueError('Could not find measure: %s' % usercpu_time)
-    measures = [scoring, usercpu_time]
-    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, measures)
+    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, [scoring, usercpu_time])
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
     tasks_tr = list(metadata_frame['task_id'].unique())
+    # remove train task from list
     tasks_tr.remove(task_id)
     if task_limit:
         tasks_tr = tasks_tr[:task_limit]
@@ -87,7 +83,6 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
     for measure, minimize in [(scoring, minimize_measure), (usercpu_time, True), (a3r, minimize_measure)]:
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
-        # config_hash = openmldefaults.utils.hash_df(config_frame_tr[measure])
         classifier_identifier = '__'.join(sorted(classifier_names))
         result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy, aggregate,
                                         str(a3r_r), str(normalize_base), str(normalize_a3r))
