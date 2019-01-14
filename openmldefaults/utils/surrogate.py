@@ -1,5 +1,6 @@
 import arff
 import ConfigSpace
+import csv
 import logging
 import math
 import numpy as np
@@ -156,7 +157,7 @@ def train_surrogate_on_task(task_id: int,
     # TODO: HPO
     nominal_pipe = sklearn.pipeline.Pipeline(steps=[
         ('imputer', sklearn.impute.SimpleImputer(strategy='constant', fill_value='-1')),
-        ('encoder', sklearn.preprocessing.OneHotEncoder())
+        ('encoder', sklearn.preprocessing.OneHotEncoder(handle_unknown='ignore'))
     ])
 
     nominal_indicators = []
@@ -379,6 +380,45 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
     logging.info('Loaded %d meta-data data frames. Dimensions: %s' % (len(metadata_files),
                                                                       str(metadata_frame_total.shape)))
     return metadata_frame_total
+
+
+def store_surrogate_based_results(scoring_frame: pd.DataFrame,
+                                  timing_frame: pd.DataFrame,
+                                  task_id: int,
+                                  indice_order: typing.List[int],
+                                  scoring: str,
+                                  usercpu_time: str,
+                                  minimize_measure: bool,
+                                  result_filepath_results: str):
+    """
+    Stores the results of the surrogated based experiment to a result file.
+    """
+    if not scoring_frame.index.equals(timing_frame.index):
+        raise ValueError()
+    if not 'task_%d' % task_id in scoring_frame.columns.values:
+        raise ValueError()
+    if not 'task_%d' % task_id in timing_frame.columns.values:
+        raise ValueError()
+
+    with open(result_filepath_results, 'w') as csvfile:
+        best_score = 1.0 if minimize_measure else 0.0
+        total_time = 0.0
+
+        fieldnames = [usercpu_time, scoring]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({scoring: best_score, usercpu_time: total_time})
+        for idx in indice_order:
+            current_score = scoring_frame.iloc[idx]['task_%d' % task_id]
+            current_time = timing_frame.iloc[idx]['task_%d' % task_id]
+            # Note that this is not the same as `minimize'. E.g., when generating sets of defaults while minimizing
+            # runtime, we still want to select the best default based on the criterion of the original measure
+            if minimize_measure:
+                best_score = min(best_score, current_score)
+            else:
+                best_score = max(best_score, current_score)
+            total_time = current_time + total_time
+            writer.writerow({scoring: best_score, usercpu_time: total_time})
 
 
 def single_prediction(df: pd.DataFrame,

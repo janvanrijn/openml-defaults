@@ -1,4 +1,3 @@
-import csv
 import joblib
 import logging
 import openmldefaults
@@ -16,6 +15,55 @@ AGGREGATES = {
 }
 
 
+def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: int,
+                                 search_space_identifier: str, scoring: str,
+                                 minimize_measure: bool, n_defaults: int,
+                                 surrogate_n_estimators: int,
+                                 surrogate_minimum_evals: int,
+                                 output_directory: str):
+    logging.info('Starting Random Search Experiment')
+    usercpu_time = 'usercpu_time_millis'
+    # joblib speed ups
+    memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
+    metadata_files_to_frame = memory.cache(openmldefaults.utils.metadata_files_to_frame)
+    generate_surrogates_using_metadata = memory.cache(openmldefaults.utils.generate_surrogates_using_metadata)
+
+    classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
+    classifier_identifier = '__'.join(sorted(classifier_names))
+    strategy_name = '%s_%s' % ('min' if minimize_measure else 'max', scoring)
+    config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
+                                                                  random_seed,
+                                                                  search_space_identifier)
+    configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_defaults)]
+    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, [scoring, usercpu_time])
+    task_ids = list(metadata_frame['task_id'].unique())
+
+    config_frame = dict()
+    for measure in [scoring, usercpu_time]:
+        logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
+        surrogates = generate_surrogates_using_metadata(metadata_frame,
+                                                        configurations,
+                                                        config_space,
+                                                        measure,
+                                                        surrogate_minimum_evals,
+                                                        surrogate_n_estimators,
+                                                        random_seed)
+        config_frame[measure] = openmldefaults.utils.generate_dataset_using_surrogates(
+            surrogates, task_ids, config_space, configurations, None, None, -1)
+
+    for task_id in task_ids:
+        result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy_name, str(random_seed))
+        result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize_measure))
+        openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
+                                                           config_frame[usercpu_time],
+                                                           task_id,
+                                                           list(range(n_defaults)),
+                                                           scoring,
+                                                           usercpu_time,
+                                                           minimize_measure,
+                                                           result_filepath_results)
+
+
 def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str],
                                    random_seed: int, search_space_identifier: str,
                                    n_configurations: int,
@@ -28,7 +76,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
     
-    logging.info('Starting on Task %d' % task_id)
+    logging.info('Starting Default Search Experiment on Task %d' % task_id)
     model = openmldefaults.models.GreedyDefaults()
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
@@ -40,6 +88,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
     generate_defaults_discretized = memory.cache(model.generate_defaults_discretized)
 
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
+    classifier_identifier = '__'.join(sorted(classifier_names))
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
@@ -83,9 +132,9 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
     for measure, minimize in [(scoring, minimize_measure), (usercpu_time, True), (a3r, minimize_measure)]:
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
-        classifier_identifier = '__'.join(sorted(classifier_names))
-        result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy, aggregate,
-                                        str(a3r_r), str(normalize_base), str(normalize_a3r))
+        result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy,
+                                        str(random_seed), aggregate, str(a3r_r), str(normalize_base),
+                                        str(normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize))
@@ -94,24 +143,12 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         with open(result_filepath_defaults, 'wb') as fp:
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
-
-        with open(result_filepath_results, 'w') as csvfile:
-            best_score = 1.0 if minimize_measure else 0.0
-            total_time = 0.0
-
-            fieldnames = [usercpu_time, scoring]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow({scoring: best_score, usercpu_time: total_time})
-            for idx, default in zip(result['indices'], result['defaults']):
-                current_score = config_frame_te[scoring].iloc[idx]['task_%d' % task_id]
-                current_time = config_frame_te[usercpu_time].iloc[idx]['task_%d' % task_id]
-                # Note that this is not the same as `minimize'. E.g., when generating sets of defaults while minimizing
-                # runtime, we still want to select the best default based on the criterion of the original measure
-                if minimize_measure:
-                    best_score = min(best_score, current_score)
-                else:
-                    best_score = max(best_score, current_score)
-                total_time = current_time + total_time
-                writer.writerow({scoring: best_score, usercpu_time: total_time})
+        openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
+                                                           config_frame_te[usercpu_time],
+                                                           task_id,
+                                                           result['indices'],
+                                                           scoring,
+                                                           usercpu_time,
+                                                           minimize,
+                                                           result_filepath_results)
         logging.info('results generated, saved to: %s' % result_filepath_results)
