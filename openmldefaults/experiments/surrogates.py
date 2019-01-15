@@ -30,7 +30,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
 
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
     classifier_identifier = '__'.join(sorted(classifier_names))
-    strategy_name = '%s_%s' % ('min' if minimize_measure else 'max', scoring)
+    strategy_name = 'random_search_%s_%s' % ('min' if minimize_measure else 'max', scoring)
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
