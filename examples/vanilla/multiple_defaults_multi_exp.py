@@ -13,7 +13,7 @@ def parse_args():
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=None)
-    parser.add_argument('--metadata_files', type=str, nargs='+', default=metadata_file)
+    parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file])
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space_identifier', type=str, default='small')
@@ -70,7 +70,7 @@ def run(args):
                             task_id=task_id,
                             random_seed=args.random_seed,
                             search_space_identifier=args.search_space_identifier,
-                            metadata_files=args.metadata_file,
+                            metadata_files=args.metadata_files,
                             scoring=args.scoring,
                             minimize_measure=args.minimize,
                             n_defaults=args.n_defaults,
