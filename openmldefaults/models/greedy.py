@@ -10,15 +10,16 @@ class GreedyDefaults(object):
     def __init__(self):
         self.name = 'greedy'
 
-    def generate_defaults(self, df: pd.DataFrame, num_defaults: int,
-                          minimize: bool, aggregate: typing.Callable,
-                          raise_no_improvement: bool):
+    def generate_defaults_discretized(self, df: pd.DataFrame, num_defaults: int,
+                                      minimize: bool, aggregate: typing.Callable,
+                                      raise_no_improvement: bool):
         """
-        Takes a data frame and returns the greedy defaults. The data frame
-        should be structured as follows: each column represents a task, each row
-        represents a configuration. As such, each cell represents the evaluation
-        of that configuration on that task. The sum of the selected configurations
-        across tasks is to be minimized or maximized
+        Takes a data frame with a discretized set of defaults and returns the
+        greedy defaults. The data frame should be structured as follows: each
+        column represents a task, each row represents a configuration. As such,
+        each cell represents the evaluation of that configuration on that task.
+        The sum of the selected configurations across tasks is to be minimized
+        or maximized
 
         Parameters
         ----------
