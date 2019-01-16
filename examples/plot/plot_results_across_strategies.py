@@ -1,5 +1,4 @@
 import argparse
-import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import seaborn as sns
@@ -78,6 +77,9 @@ def make_difference_df(df: pd.DataFrame, keys: typing.List, difference_field: st
 
 
 def run(args):
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
     usercpu_time = 'usercpu_time_millis'
     result_total = None
     folder_constraints = {
@@ -104,8 +106,7 @@ def run(args):
                                                                                       args.n_defaults_in_file,
                                                                                       budget,
                                                                                       folder_constraints,
-                                                                                      False)
-
+                                                                                      False, False)
         result_budget['budget'] = budget
         if result_budget.shape[0] < EXPECTED_DATASETS * EXPECTED_STRATEGIES:
             msg = 'Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_STRATEGIES,
@@ -129,8 +130,8 @@ def run(args):
     # sanity check results
     index_columns = ['task_id', 'strategy', 'random_seed', 'param_aggregate',
                      'param_a3r_r', 'param_normalize_base', 'param_normalize_a3r']
-    openmldefaults.utils.check_budget_curves(result_total, index_columns, args.scoring, 'budget')
-    openmldefaults.utils.check_budget_curves(result_total, index_columns, usercpu_time, 'budget')
+    openmldefaults.utils.check_budget_curves(result_total, index_columns, args.scoring, 'budget', 0.0, 1.0)
+    openmldefaults.utils.check_budget_curves(result_total, index_columns, usercpu_time, 'budget', 1.0, None)
 
     output_directory_full = os.path.join(args.output_directory, args.classifier_name)
     os.makedirs(output_directory_full, exist_ok=True)
@@ -191,7 +192,6 @@ def run(args):
                     output_file = os.path.join(output_directory_full, '%s_agg.png' % title)
                     plt.savefig(output_file)
                     logging.info('stored figure to %s' % output_file)
-
 
                     # plot individual loss curves
                     rows = 10

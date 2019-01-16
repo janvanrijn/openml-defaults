@@ -118,9 +118,14 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
             surrogates, tasks_tr, config_space, configurations, normalize, None, -1)
         config_frame_tr[measure] = frame_tr
+        # NEVER! Normalize the test frame
         frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, tasks_te, config_space, configurations, normalize, None, -1)
+            surrogates, tasks_te, config_space, configurations, None, None, -1)
         config_frame_te[measure] = frame_te
+        logging.info('Ranges test task %d for measure %s [%f-%f]:' % (task_id,
+                                                                      measure,
+                                                                      min(frame_te['task_%d' % task_id]),
+                                                                      max(frame_te['task_%d' % task_id])))
     # adds A3R frame
     config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[scoring],
                                                                  config_frame_tr[usercpu_time],

@@ -152,7 +152,10 @@ def train_surrogate_on_task(task_id: int,
 
     y = setup_data[evaluation_measure].values
     del setup_data[evaluation_measure]
-    logging.info('Dimensions of meta-data task %d: %s' % (task_id, str(setup_data.shape)))
+    logging.info('Dimensions of meta-data task %d: %s. Target %s [%f-%f]' % (task_id,
+                                                                             str(setup_data.shape),
+                                                                             evaluation_measure,
+                                                                             min(y), max(y)))
 
     # TODO: HPO
     nominal_pipe = sklearn.pipeline.Pipeline(steps=[
@@ -233,7 +236,7 @@ def generate_dataset_using_surrogates(
     for task_id in task_ids:
         surrogate_values = surrogates[task_id].predict(df_orig.values)
         if scaler_type is not None:
-            logging.info('scaling dataframe using %s' % scaler_type)
+            logging.info('scaling predictions for task %d using %s' % (task_id, scaler_type))
             scaler = openmldefaults.utils.get_scaler(scaler_type)
             surrogate_values = scaler.fit_transform(surrogate_values.reshape(-1, 1))[:, 0]
         column_name = 'task_%d' % task_id
@@ -333,6 +336,10 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
             metadata_frame_classif['classifier'] = classifier_name
             logging.info('Loaded %s meta-data data frame. Dimensions: %s' % (classifier_name,
                                                                              str(metadata_frame_classif.shape)))
+            for measure in scoring:
+                logging.info('meta-data ranges for measure %s: [%f-%f]' % (measure,
+                                                                           min(metadata_frame_classif[measure]),
+                                                                           max(metadata_frame_classif[measure])))
 
             # TODO: modularize. Remove unnecessary columns
             legal_column_names = config_space.get_hyperparameter_names() + scoring + ['classifier', 'task_id']
@@ -369,7 +376,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
             if metadata_frame_total is None:
                 metadata_frame_total = metadata_frame_classif
             else:
-                # TODO: due to a bug in pandas, we need to manually cast columns to Int64.
+                # TODO: due to a bug in pandas, we need to manually cast columns back to Int64.
                 # See: https://github.com/pandas-dev/pandas/issues/24768
                 int_columns = list(metadata_frame_classif.select_dtypes(include=['Int64']).columns) + \
                               list(metadata_frame_total.select_dtypes(include=['Int64']).columns)

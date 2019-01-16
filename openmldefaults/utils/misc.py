@@ -1,5 +1,6 @@
 import ConfigSpace
 import csv
+import logging
 import os
 import pandas as pd
 import typing
@@ -20,8 +21,11 @@ def remove_hyperparameter(config_space: ConfigSpace.ConfigurationSpace,
 
 
 def _traverse_run_folders(folder: str, n_defaults: int, traversed_directories: typing.List[str],
-                          constraints: typing.Optional[typing.Dict[int, typing.List[str]]]) \
+                          constraints: typing.Optional[typing.Dict[int, typing.List[str]]], log: bool) \
         -> typing.List[typing.List[str]]:
+    if log:
+        depth = len(traversed_directories) + 1
+        logging.info('-' * depth + ': ' + folder)
     folder_content = os.listdir(folder)
     if 'results_%d_1.csv' % n_defaults in folder_content:
         return [traversed_directories + ['results_%d_1.csv' % n_defaults]]
@@ -37,13 +41,13 @@ def _traverse_run_folders(folder: str, n_defaults: int, traversed_directories: t
                     continue
             subfolder = os.path.join(folder, item)
             if os.path.isdir(subfolder):
-                results += _traverse_run_folders(subfolder, n_defaults, traversed_directories + [item], constraints)
+                results += _traverse_run_folders(subfolder, n_defaults, traversed_directories + [item], constraints, log)
         return results
 
 
 def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
                               constraints: typing.Optional[typing.Dict[int, typing.List[str]]],
-                              raise_if_not_enough: bool) \
+                              raise_if_not_enough: bool, log: bool) \
         -> typing.Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Traverses all subdirecties, and obtains stored runs with evaluation scores.
@@ -66,6 +70,9 @@ def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
     raise_if_not_enough: bool
         If true, it raises an error when there are not enough results
 
+    log: bool
+        if set, the script outputs each traversed directory
+
     Returns
     -------
     pd.DataFrame
@@ -74,7 +81,7 @@ def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
         a data frame with columns for each folder level and the loss curve (in a
         single cell)
     """
-    list_dirs_runs = _traverse_run_folders(folder, n_defaults_in_file, list(), constraints)
+    list_dirs_runs = _traverse_run_folders(folder, n_defaults_in_file, list(), constraints, log)
     results_vanilla = []
     results_curves = []
     for dirs in list_dirs_runs:
