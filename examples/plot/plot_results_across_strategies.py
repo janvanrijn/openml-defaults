@@ -32,28 +32,6 @@ def filter_frame(df: pd.DataFrame, filters: typing.Dict):
     return df
 
 
-def check_budget_curves(df: pd.DataFrame, values_column: str):
-    results_pivot = df.pivot_table(
-        values=values_column,
-        index=['task_id', 'strategy', 'random_seed', 'param_aggregate',
-               'param_a3r_r', 'param_normalize_base', 'param_normalize_a3r'],
-        columns='budget',
-        aggfunc=np.mean)
-
-    last_column = 0.0
-    for column in results_pivot.columns.values:
-        if last_column > column:
-            logging.warning('Weird column order: %s' % results_pivot.columns.values)
-        last_column = int(column)
-
-    for index, row in results_pivot.iterrows():
-        last_value = 0.0
-        for column, value in row.iteritems():
-            if value < last_value:
-                logging.warning('Series not strictly improving at budget %d for %s with %s. Previous %f, current %f' % (column, values_column, index, last_value, value))
-            last_value = value
-
-
 def make_difference_df(df: pd.DataFrame, keys: typing.List, difference_field: str):
     result = None
     difference_vals = df[difference_field].unique()
@@ -149,8 +127,10 @@ def run(args):
     result_curves[usercpu_time] = result_curves[usercpu_time].astype(float)
 
     # sanity check results
-    check_budget_curves(result_total, args.scoring)
-    check_budget_curves(result_total, usercpu_time)
+    index_columns = ['task_id', 'strategy', 'random_seed', 'param_aggregate',
+                     'param_a3r_r', 'param_normalize_base', 'param_normalize_a3r']
+    openmldefaults.utils.check_budget_curves(result_total, index_columns, args.scoring, 'budget')
+    openmldefaults.utils.check_budget_curves(result_total, index_columns, usercpu_time, 'budget')
 
     output_directory_full = os.path.join(args.output_directory, args.classifier_name)
     os.makedirs(output_directory_full, exist_ok=True)
