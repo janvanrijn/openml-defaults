@@ -11,8 +11,8 @@ import typing
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
-    parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/habanero_experiments/openml-defaults'))
-    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults'))
+    parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/habanero_experiments/openml-defaults/vanilla_vs_a3r'))
+    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/vanilla_vs_a3r'))
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--classifier_name', type=str, default='svc')
     parser.add_argument('--n_defaults_in_file', type=int, default=32)
@@ -34,15 +34,22 @@ def filter_frame(df: pd.DataFrame, filters: typing.Dict):
 def check_budget_curves(df: pd.DataFrame, values_column: str):
     results_pivot = df.pivot_table(
         values=values_column,
-        index=['folder_depth_0', 'folder_depth_1', 'folder_depth_2',
-               'folder_depth_3', 'folder_depth_4', 'folder_depth_5'],
+        index=['task_id', 'strategy', 'random_seed', 'param_aggregate',
+               'param_a3r_r', 'param_normalize_base', 'param_normalize_a3r'],
         columns='budget',
         aggfunc=np.mean)
+
+    last_column = 0.0
+    for column in results_pivot.columns.values:
+        if last_column > column:
+            logging.warning('Weird column order: %s' % results_pivot.columns.values)
+        last_column = int(column)
+
     for index, row in results_pivot.iterrows():
         last_value = 0.0
         for column, value in row.iteritems():
             if value < last_value:
-                logging.warning('Series not strictly improving at budget %d for %s' % (column, index))
+                logging.warning('Series not strictly improving at budget %d for %s with %s. Previous %f, current %f' % (column, values_column, index, last_value, value))
             last_value = value
 
 
@@ -95,10 +102,20 @@ def run(args):
     usercpu_time = 'usercpu_time_millis'
     result_total = None
     folder_constraints = {
-        2: ['median'],
-        3: ['1'],
-        4: ['MinMaxScaler'],
-        5: ['None']
+        2: ['42'],
+        3: ['sum'],
+        4: ['1'],
+        5: ['None'],
+        6: ['None']
+    }
+    folder_legend = {
+        'folder_depth_0': 'task_id',
+        'folder_depth_1': 'strategy',
+        'folder_depth_2': 'random_seed',
+        'folder_depth_3': 'param_aggregate',
+        'folder_depth_4': 'param_a3r_r',
+        'folder_depth_5': 'param_normalize_base',
+        'folder_depth_6': 'param_normalize_a3r',
     }
     # folder_constraints = None
     results_directory = os.path.join(args.results_directory, args.classifier_name)
@@ -109,6 +126,7 @@ def run(args):
                                                                                       budget,
                                                                                       folder_constraints,
                                                                                       False)
+
         result_budget['budget'] = budget
         if result_budget.shape[0] < EXPECTED_DATASETS * EXPECTED_STRATEGIES:
             raise ValueError('Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_STRATEGIES,
@@ -117,6 +135,8 @@ def run(args):
             result_total = result_budget
         else:
             result_total = result_total.append(result_budget)
+    result_total = result_total.rename(index=str, columns=folder_legend)
+    result_curves = result_curves.rename(index=str, columns=folder_legend)
 
     result_total[args.scoring] = result_total[args.scoring].astype(float)
     result_total[usercpu_time] = result_total[usercpu_time].astype(float)
@@ -130,15 +150,15 @@ def run(args):
     output_directory_full = os.path.join(args.output_directory, args.classifier_name)
     os.makedirs(output_directory_full, exist_ok=True)
 
-    for normalize_base in result_total['folder_depth_4'].unique():
-        for normalize_a3r in result_total['folder_depth_5'].unique():
-            for a3r_r in result_total['folder_depth_3'].unique():
-                for aggregate in result_total['folder_depth_2'].unique():
+    for normalize_base in result_total['param_normalize_base'].unique():
+        for normalize_a3r in result_total['param_normalize_a3r'].unique():
+            for a3r_r in result_total['param_a3r_r'].unique():
+                for aggregate in result_total['param_aggregate'].unique():
                     filters = {
-                        'folder_depth_4': normalize_base,
-                        'folder_depth_5': normalize_a3r,
-                        'folder_depth_3': a3r_r,
-                        'folder_depth_2': aggregate,
+                        'param_normalize_base': normalize_base,
+                        'param_normalize_a3r': normalize_a3r,
+                        'param_a3r_r': a3r_r,
+                        'param_aggregate': aggregate,
                     }
                     title = 'normalize_base=%s; normalize_a3r=%s; a3r_r=%s; aggregate=%s' % (normalize_base,
                                                                                              normalize_a3r,
@@ -146,7 +166,7 @@ def run(args):
                                                                                              aggregate)
                     filtered_results = filter_frame(result_total, filters)
                     filtered_curves = filter_frame(result_curves, filters)
-                    strategies = filtered_results['folder_depth_1'].unique()
+                    strategies = filtered_results['strategy'].unique()
 
                     expected_rows_results = EXPECTED_DATASETS * EXPECTED_STRATEGIES * len(ALL_BUDGETS)
                     expected_rows_curves = EXPECTED_DATASETS * EXPECTED_STRATEGIES * (ALL_BUDGETS[-1] + 1)
@@ -158,23 +178,20 @@ def run(args):
                         logging.warning('Unexpected curve df shape. Expected %d rows, got %d rows' % (expected_rows_curves,
                                                                                                       filtered_curves.shape[0]))
                         continue
-                    # time_curves = make_time_curves(filtered_curves, ['folder_depth_0', 'folder_depth_1'], usercpu_time, args.scoring)
-                    # time_curves = time_curves.reset_index()
-                    # del time_curves['folder_depth_0']
 
                     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(24, 12))
 
                     # absolute plots
-                    sns.boxplot(x="budget", y=args.scoring, hue="folder_depth_1", data=filtered_results, ax=ax1)
-                    sns.boxplot(x="budget", y=usercpu_time, hue="folder_depth_1", data=filtered_results, ax=ax2)
+                    sns.boxplot(x="budget", y=args.scoring, hue="strategy", data=filtered_results, ax=ax1)
+                    sns.boxplot(x="budget", y=usercpu_time, hue="strategy", data=filtered_results, ax=ax2)
                     ax2.set(yscale="log")
-                    sns.boxplot(x="budget", y='n_defaults', hue="folder_depth_1", data=filtered_results, ax=ax3)
+                    sns.boxplot(x="budget", y='n_defaults', hue="strategy", data=filtered_results, ax=ax3)
 
                     # difference plots
                     results_difference = make_difference_df(filtered_results,
-                                                            ['folder_depth_0', 'folder_depth_2', 'folder_depth_3',
-                                                             'folder_depth_4', 'folder_depth_5', 'budget'],
-                                                            'folder_depth_1')
+                                                            ['task_id', 'random_seed', 'param_aggregate', 'param_a3r_r',
+                                                             'param_normalize_base', 'param_normalize_a3r', 'budget'],
+                                                            'strategy')
 
                     sns.boxplot(x="budget", y=args.scoring, hue="strategies", data=results_difference, ax=ax4)
                     sns.boxplot(x="budget", y=usercpu_time, hue="strategies", data=results_difference, ax=ax5)
@@ -188,22 +205,22 @@ def run(args):
                     rows = 10
                     cols = 10
                     fig, axes = plt.subplots(rows, cols, figsize=(24, 12))
-                    task_ids = result_curves['folder_depth_0'].unique()
+                    task_ids = result_curves['task_id'].unique()
                     win_counts = list()
                     for idx, task_id in enumerate(task_ids):
-                        current_task = result_curves.loc[result_curves['folder_depth_0'] == task_id]
+                        current_task = result_curves.loc[result_curves['task_id'] == task_id]
                         if len(current_task) == 0:
                             # in case no results on a task
                             continue
                         legend = 'brief' if idx == 0 else None
                         sns.lineplot(x=usercpu_time, y=args.scoring, markers=True,
-                                     hue="folder_depth_1", data=current_task,
+                                     hue="strategy", data=current_task,
                                      ax=axes[idx % cols, int(idx / cols)], legend=legend)
 
                         for strategy in strategies:
-                            time_threshold = current_task[current_task['folder_depth_1'] == strategy][usercpu_time].max()
+                            time_threshold = current_task[current_task['strategy'] == strategy][usercpu_time].max()
                             current_task_threshold = current_task.loc[current_task[usercpu_time] <= time_threshold]
-                            result = current_task_threshold.groupby('folder_depth_1')['predictive_accuracy'].max()
+                            result = current_task_threshold.groupby('strategy')['predictive_accuracy'].max()
                             for idx_a, strategy_a in enumerate(strategies):
                                 for idx_b, strategy_b in enumerate(strategies):
                                     if idx_a >= idx_b:

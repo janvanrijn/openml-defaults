@@ -149,6 +149,6 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                            result['indices'],
                                                            scoring,
                                                            usercpu_time,
-                                                           minimize,
+                                                           minimize_measure,
                                                            result_filepath_results)
         logging.info('results generated, saved to: %s' % result_filepath_results)
