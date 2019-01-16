@@ -23,6 +23,7 @@ def parse_args():
 EXPECTED_DATASETS = 99
 EXPECTED_STRATEGIES = 3
 ALL_BUDGETS = [1, 2, 4, 8, 16, 32]
+STRICT_CHECK = False
 
 
 def filter_frame(df: pd.DataFrame, filters: typing.Dict):
@@ -129,8 +130,12 @@ def run(args):
 
         result_budget['budget'] = budget
         if result_budget.shape[0] < EXPECTED_DATASETS * EXPECTED_STRATEGIES:
-            raise ValueError('Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_STRATEGIES,
-                                                                                   result_budget.shape[0]))
+            msg = 'Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_STRATEGIES,
+                                                                        result_budget.shape[0])
+            if STRICT_CHECK:
+                raise ValueError(msg)
+            else:
+                logging.warning(msg)
         if result_total is None:
             result_total = result_budget
         else:
@@ -171,13 +176,17 @@ def run(args):
                     expected_rows_results = EXPECTED_DATASETS * EXPECTED_STRATEGIES * len(ALL_BUDGETS)
                     expected_rows_curves = EXPECTED_DATASETS * EXPECTED_STRATEGIES * (ALL_BUDGETS[-1] + 1)
                     if filtered_results.shape[0] != expected_rows_results:
-                        logging.warning('Unexpected results df shape. Expected %d rows, got %d rows' % (expected_rows_results,
-                                                                                                        filtered_results.shape[0]))
-                        continue
+                        msg = 'Unexpected results df shape. Expected %d rows, got %d rows' % (expected_rows_results,
+                                                                                              filtered_results.shape[0])
+                        logging.warning(msg)
+                        if STRICT_CHECK:
+                            continue
                     if filtered_curves.shape[0] != expected_rows_curves:
-                        logging.warning('Unexpected curve df shape. Expected %d rows, got %d rows' % (expected_rows_curves,
-                                                                                                      filtered_curves.shape[0]))
-                        continue
+                        msg = 'Unexpected curve df shape. Expected %d rows, got %d rows' % (expected_rows_curves,
+                                                                                            filtered_curves.shape[0])
+                        logging.warning(msg)
+                        if STRICT_CHECK:
+                            continue
 
                     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(24, 12))
 
@@ -199,7 +208,10 @@ def run(args):
                     sns.boxplot(x="budget", y='n_defaults', hue="strategies", data=results_difference, ax=ax6)
 
                     plt.title(title)
-                    plt.savefig(os.path.join(output_directory_full, '%s_agg.png' % title))
+                    output_file = os.path.join(output_directory_full, '%s_agg.png' % title)
+                    plt.savefig(output_file)
+                    logging.info('stored figure to %s' % output_file)
+
 
                     # plot individual loss curves
                     rows = 10
@@ -236,7 +248,9 @@ def run(args):
                     win_counts = pd.DataFrame(win_counts)
                     print(win_counts.groupby(['threshold_base', 'strategy_a', 'strategy_b'])['a_better'].sum())
 
-                    plt.savefig(os.path.join(output_directory_full, '%s_loss.png' % title), dpi=300)
+                    output_file = os.path.join(output_directory_full, '%s_loss.png' % title)
+                    plt.savefig(output_file, dpi=300)
+                    logging.info('stored figure to %s' % output_file)
 
 
 if __name__ == '__main__':
