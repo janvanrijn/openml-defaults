@@ -18,7 +18,7 @@ def parse_args():
 EXPECTED_DATASETS = 99
 EXPECTED_SEARCH_SPACES = 3
 ALL_BUDGETS = [1, 2, 4, 8, 16, 32]
-STRICT_CHECK = True
+STRICT_CHECK = False
 
 
 def run(args):
@@ -53,8 +53,9 @@ def run(args):
             result_total = result_budget
         else:
             result_total = result_total.append(result_budget)
-    if result_total.shape[0] < EXPECTED_DATASETS * EXPECTED_SEARCH_SPACES * len(ALL_BUDGETS):
-        msg = 'Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_SEARCH_SPACES,
+    expectation = EXPECTED_DATASETS * EXPECTED_SEARCH_SPACES * len(ALL_BUDGETS)
+    if result_total.shape[0] < expectation:
+        msg = 'Not enough results! Expected at least %d, got %d' % (expectation,
                                                                     result_total.shape[0])
         if STRICT_CHECK:
             raise ValueError(msg)
@@ -66,7 +67,7 @@ def run(args):
 
     index_columns = ['search_space', 'task_id', 'strategy', 'random_seed', 'param_aggregate',
                      'param_a3r_r', 'param_normalize_base', 'param_normalize_a3r']
-    openmldefaults.utils.check_budget_curves(result_total, index_columns, args.scoring, 'budget')
+    openmldefaults.utils.check_budget_curves(result_total, index_columns, args.scoring, 'budget', 0.0, 1.0)
 
     for column in ['param_aggregate', 'param_a3r_r', 'param_normalize_base', 'param_normalize_a3r']:
         if len(result_total[column].unique()) > 2:

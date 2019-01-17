@@ -43,7 +43,7 @@ def make_difference_df(df: pd.DataFrame, keys: typing.List, difference_field: st
             del df_a[difference_field]
             del df_b[difference_field]
             if df_a.shape != df_b.shape:
-                raise ValueError()
+                raise ValueError('Dataframe shapes do not collide. %s vs %s' % (df_a.shape, df_b.shape))
             difference_frame = df_a - df_b
             difference_frame['strategies'] = '%s-%s' % (difference_vals[i], difference_vals[j])
             if result is None:
@@ -108,8 +108,9 @@ def run(args):
                                                                                       folder_constraints,
                                                                                       False, False)
         result_budget['budget'] = budget
-        if result_budget.shape[0] < EXPECTED_DATASETS * EXPECTED_STRATEGIES:
-            msg = 'Not enough results! Expected at least %d, got %d' % (EXPECTED_DATASETS * EXPECTED_STRATEGIES,
+        expectation = EXPECTED_DATASETS * EXPECTED_STRATEGIES
+        if result_budget.shape[0] < expectation:
+            msg = 'Not enough results! Expected at least %d, got %d' % (expectation,
                                                                         result_budget.shape[0])
             if STRICT_CHECK:
                 raise ValueError(msg)
