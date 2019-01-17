@@ -24,20 +24,20 @@ def parse_args():
 def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
-    logging.info('Started %s' % os.path.basename(__file__))
+    logging.info('Started %s with args %s' % (os.path.basename(__file__), args))
 
     usercpu_time = 'usercpu_time_millis'
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(args.metadata_files,
                                                                   args.search_space_identifier,
                                                                   [args.scoring, usercpu_time])
-    print(metadata_frame.columns.values)
     metadata_frame = metadata_frame.groupby(['task_id', 'classifier'])[args.scoring].max().reset_index()
     fig, ax = plt.subplots()
 
     # absolute plots
-    os.makedirs(args.output_file, exist_ok=True)
+    os.makedirs(args.output_directory, exist_ok=True)
     sns.boxplot(x="classifier", y=args.scoring, data=metadata_frame, ax=ax)
-    output_file = os.path.join(args.output_directory, 'performances.png')
+    identifier = args.search_space_identifier if args.search_space_identifier is not None else 'full'
+    output_file = os.path.join(args.output_directory, 'performances_%s.png' % identifier)
     plt.savefig(output_file)
     logging.info('stored figure to %s' % output_file)
 
