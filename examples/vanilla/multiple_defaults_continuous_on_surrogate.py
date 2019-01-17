@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_svc, metadata_file_gb])
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
-    parser.add_argument('--search_space_identifier', type=str, default='small')
+    parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--n_configurations', type=int, default=2**13)
     parser.add_argument('--normalize_base', type=str, default='MinMaxScaler')

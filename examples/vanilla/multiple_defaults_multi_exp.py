@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file])
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
-    parser.add_argument('--search_space_identifier', type=str, default='small')
+    parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
