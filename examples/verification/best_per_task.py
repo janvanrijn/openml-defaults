@@ -25,19 +25,25 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     logging.info('Started %s with args %s' % (os.path.basename(__file__), args))
+    os.makedirs(args.output_directory, exist_ok=True)
 
     usercpu_time = 'usercpu_time_millis'
+    identifier = args.search_space_identifier if args.search_space_identifier is not None else 'full'
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(args.metadata_files,
                                                                   args.search_space_identifier,
                                                                   [args.scoring, usercpu_time])
-    metadata_frame = metadata_frame.groupby(['task_id', 'classifier'])[args.scoring].max().reset_index()
-    fig, ax = plt.subplots()
+    best_frame = metadata_frame.groupby(['task_id', 'classifier'])[args.scoring].max().reset_index()
 
-    # absolute plots
-    os.makedirs(args.output_directory, exist_ok=True)
-    sns.boxplot(x="classifier", y=args.scoring, data=metadata_frame, ax=ax)
-    identifier = args.search_space_identifier if args.search_space_identifier is not None else 'full'
+    #  plots
+    fig, ax = plt.subplots()
+    sns.boxplot(x="classifier", y=args.scoring, data=best_frame, ax=ax)
     output_file = os.path.join(args.output_directory, 'performances_%s.png' % identifier)
+    plt.savefig(output_file)
+    logging.info('stored figure to %s' % output_file)
+
+    fig, ax = plt.subplots()
+    sns.boxplot(x="task_id", y=args.scoring, hue='classifier', data=metadata_frame, ax=ax)
+    output_file = os.path.join(args.output_directory, 'spread_%s.png' % identifier)
     plt.savefig(output_file)
     logging.info('stored figure to %s' % output_file)
 
