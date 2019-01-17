@@ -33,9 +33,9 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    normalize_bases = [None, 'MinMaxScaler', 'StandardScaler']
-    normalize_a3rs = [None, 'MinMaxScaler', 'StandardScaler']
-    a3r_rs = [1, 2, 3, 4]
+    normalize_bases = [None, 'MinMaxScaler']
+    normalize_a3rs = ['StandardScaler']
+    a3r_rs = [1, 2, 3]
     aggregates = ['sum', 'median']
     total_experiments = len(normalize_bases) * len(normalize_a3rs) * len(a3r_rs) * len(aggregates)
 
