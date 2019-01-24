@@ -1,4 +1,6 @@
+from . import adaboost
 from . import gradient_boosting
+from . import random_forest
 from . import svc
 
 import ConfigSpace
