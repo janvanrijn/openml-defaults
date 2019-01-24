@@ -56,6 +56,7 @@ def run(args):
             n_defaults=args.n_defaults,
             surrogate_n_estimators=args.n_estimators,
             surrogate_minimum_evals=args.minimum_evals,
+            consider_runtime=False,
             output_directory=args.output_directory
         )
 
@@ -75,6 +76,8 @@ def run(args):
                 normalize_a3r=args.normalize_a3r,
                 surrogate_n_estimators=args.n_estimators,
                 surrogate_minimum_evals=args.minimum_evals,
+                consider_runtime=False,
+                consider_a3r=False,
                 task_limit=args.task_limit,
                 output_directory=args.output_directory)
 

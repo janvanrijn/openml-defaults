@@ -378,11 +378,16 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
             else:
                 # TODO: due to a bug in pandas, we need to manually cast columns back to Int64.
                 # See: https://github.com/pandas-dev/pandas/issues/24768
+                # also add boolean columns (will be casted to int)
                 int_columns = list(metadata_frame_classif.select_dtypes(include=['Int64']).columns) + \
                               list(metadata_frame_total.select_dtypes(include=['Int64']).columns)
+                bool_columns = list(metadata_frame_classif.select_dtypes(include=[bool]).columns) + \
+                               list(metadata_frame_total.select_dtypes(include=[bool]).columns)
                 metadata_frame_total = metadata_frame_total.append(metadata_frame_classif)
                 for column in int_columns:
                     metadata_frame_total[column] = metadata_frame_total[column].astype('Int64')
+                for column in bool_columns:
+                    metadata_frame_total[column] = metadata_frame_total[column].astype(float)
 
     logging.info('Loaded %d meta-data data frames. Dimensions: %s' % (len(metadata_files),
                                                                       str(metadata_frame_total.shape)))
@@ -390,7 +395,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
 
 
 def store_surrogate_based_results(scoring_frame: pd.DataFrame,
-                                  timing_frame: pd.DataFrame,
+                                  timing_frame: typing.Optional[pd.DataFrame],
                                   task_id: int,
                                   indice_order: typing.List[int],
                                   scoring: str,
@@ -400,25 +405,28 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
     """
     Stores the results of the surrogated based experiment to a result file.
     """
-    if not scoring_frame.index.equals(timing_frame.index):
-        raise ValueError()
     if not 'task_%d' % task_id in scoring_frame.columns.values:
         raise ValueError()
-    if not 'task_%d' % task_id in timing_frame.columns.values:
-        raise ValueError()
+    if timing_frame is not None:
+        if not 'task_%d' % task_id in timing_frame.columns.values:
+            raise ValueError()
+        if not scoring_frame.index.equals(timing_frame.index):
+            raise ValueError()
 
     os.makedirs(os.path.dirname(result_filepath_results), exist_ok=True)
     with open(result_filepath_results, 'w') as csvfile:
         best_score = 1.0 if minimize_measure else 0.0
         total_time = 0.0
 
-        fieldnames = [usercpu_time, scoring]
+        fieldnames = ['iteration', usercpu_time, scoring]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerow({scoring: best_score, usercpu_time: total_time})
+        writer.writerow({scoring: best_score, usercpu_time: total_time, 'iteration': 0})
         for idx in indice_order:
             current_score = scoring_frame.iloc[idx]['task_%d' % task_id]
-            current_time = timing_frame.iloc[idx]['task_%d' % task_id]
+            current_time = np.nan
+            if timing_frame is not None:
+                current_time = timing_frame.iloc[idx]['task_%d' % task_id]
             # Note that this is not the same as `minimize'. E.g., when generating sets of defaults while minimizing
             # runtime, we still want to select the best default based on the criterion of the original measure
             if minimize_measure:
@@ -426,7 +434,7 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
             else:
                 best_score = max(best_score, current_score)
             total_time = current_time + total_time
-            writer.writerow({scoring: best_score, usercpu_time: total_time})
+            writer.writerow({scoring: best_score, usercpu_time: total_time, 'iteration': idx+1})
 
 
 def single_prediction(df: pd.DataFrame,

@@ -41,7 +41,7 @@ def run(args):
     plt.savefig(output_file)
     logging.info('stored figure to %s' % output_file)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(48, 6))
     sns.boxplot(x="task_id", y=args.scoring, hue='classifier', data=metadata_frame, ax=ax)
     output_file = os.path.join(args.output_directory, 'spread_%s.png' % identifier)
     plt.savefig(output_file)

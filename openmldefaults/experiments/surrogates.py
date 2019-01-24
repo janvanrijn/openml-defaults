@@ -20,6 +20,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                  minimize_measure: bool, n_defaults: int,
                                  surrogate_n_estimators: int,
                                  surrogate_minimum_evals: int,
+                                 consider_runtime: bool,
                                  output_directory: str):
     logging.info('Starting Random Search Experiment')
     usercpu_time = 'usercpu_time_millis'
@@ -39,7 +40,10 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     task_ids = list(metadata_frame['task_id'].unique())
 
     config_frame = dict()
-    for measure in [scoring, usercpu_time]:
+    measures = [scoring]
+    if consider_runtime:
+        measures = [scoring, usercpu_time]
+    for measure in measures:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
         surrogates = generate_surrogates_using_metadata(metadata_frame,
                                                         configurations,
@@ -55,7 +59,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
         result_directory = os.path.join(output_directory, classifier_identifier, str(int(task_id)), strategy_name, str(random_seed))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize_measure))
         openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
-                                                           config_frame[usercpu_time],
+                                                           config_frame[usercpu_time] if consider_runtime else None,
                                                            task_id,
                                                            list(range(n_defaults)),
                                                            scoring,
@@ -71,10 +75,15 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                    n_defaults: int, aggregate: str, a3r_r: int,
                                    normalize_base: str, normalize_a3r: str,
                                    surrogate_n_estimators: int,
-                                   surrogate_minimum_evals: int, task_limit: int,
+                                   surrogate_minimum_evals: int,
+                                   consider_runtime: bool,
+                                   consider_a3r: bool,
+                                   task_limit: int,
                                    output_directory: str):
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
+    if consider_a3r and not consider_runtime:
+        raise ValueError('Can only consider a3r when runtime is also considered.')
     
     logging.info('Starting Default Search Experiment on Task %d' % task_id)
     model = openmldefaults.models.GreedyDefaults()
@@ -106,7 +115,10 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
 
     config_frame_tr = dict()
     config_frame_te = dict()
-    for measure, normalize in [(scoring, normalize_base), (usercpu_time, normalize_base)]:
+    measures = [(scoring, normalize_base)]
+    if consider_runtime:
+        measures.append((usercpu_time, normalize_base))
+    for measure, normalize in measures:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
         surrogates = generate_surrogates_using_metadata(metadata_frame,
                                                         configurations,
@@ -126,15 +138,19 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                                       measure,
                                                                       min(frame_te['task_%d' % task_id]),
                                                                       max(frame_te['task_%d' % task_id])))
-    # adds A3R frame
-    config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[scoring],
-                                                                 config_frame_tr[usercpu_time],
-                                                                 a3r_r)
+    if consider_a3r:
+        # adds A3R frame
+        config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[scoring],
+                                                                     config_frame_tr[usercpu_time],
+                                                                     a3r_r)
 
-    config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r], normalize_a3r)
+        config_frame_tr[a3r] = openmldefaults.utils.normalize_df_columnwise(config_frame_tr[a3r], normalize_a3r)
 
     # whether to optimize scoring is parameterized, same for a3r (which follows from scoring). runtime always min
     for measure, minimize in [(scoring, minimize_measure), (usercpu_time, True), (a3r, minimize_measure)]:
+        if measure not in config_frame_tr:
+            continue
+
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy,
@@ -149,7 +165,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
         openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
-                                                           config_frame_te[usercpu_time],
+                                                           config_frame_te[usercpu_time] if consider_runtime else None,
                                                            task_id,
                                                            result['indices'],
                                                            scoring,
