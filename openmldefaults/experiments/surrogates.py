@@ -24,6 +24,9 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                  output_directory: str):
     logging.info('Starting Random Search Experiment')
     usercpu_time = 'usercpu_time_millis'
+    measures = [scoring]
+    if consider_runtime:
+        measures = [scoring, usercpu_time]
     # joblib speed ups
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
     metadata_files_to_frame = memory.cache(openmldefaults.utils.metadata_files_to_frame)
@@ -36,13 +39,10 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_defaults)]
-    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, [scoring, usercpu_time])
+    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, measures)
     task_ids = list(metadata_frame['task_id'].unique())
 
     config_frame = dict()
-    measures = [scoring]
-    if consider_runtime:
-        measures = [scoring, usercpu_time]
     for measure in measures:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
         surrogates = generate_surrogates_using_metadata(metadata_frame,
@@ -89,6 +89,9 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
     model = openmldefaults.models.GreedyDefaults()
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
+    measures = [scoring]
+    if consider_runtime:
+        measures = [scoring, usercpu_time]
 
     # joblib speed ups
     memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
@@ -102,7 +105,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_configurations)]
-    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, [scoring, usercpu_time])
+    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, measures)
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
@@ -115,10 +118,10 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
 
     config_frame_tr = dict()
     config_frame_te = dict()
-    measures = [(scoring, normalize_base)]
+    measures_normalize = [(scoring, normalize_base)]
     if consider_runtime:
-        measures.append((usercpu_time, normalize_base))
-    for measure, normalize in measures:
+        measures_normalize.append((usercpu_time, normalize_base))
+    for measure, normalize in measures_normalize:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
         surrogates = generate_surrogates_using_metadata(metadata_frame,
                                                         configurations,

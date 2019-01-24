@@ -11,6 +11,9 @@ import pandas as pd
 def parse_args():
     metadata_file_svc = os.path.expanduser('~/data/openml-defaults/svc.arff')
     metadata_file_gb = os.path.expanduser('~/data/openml-defaults/gradient_boosting.arff')
+    metadata_file_adaboost019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/adaboost.arff')
+    metadata_file_random_forest019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/random_forest.arff')
+    metadata_file_random_svc = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/svc.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults_vs_rs/')

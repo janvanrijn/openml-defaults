@@ -39,3 +39,4 @@ def get_hyperparameter_search_space_sklearn_0_19(seed):
     cs.add_hyperparameters([imputation, n_estimators, criterion, max_features,
                             min_samples_split, min_samples_leaf,
                             bootstrap, min_weight_fraction_leaf])
+    return cs
