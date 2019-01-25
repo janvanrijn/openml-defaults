@@ -1,5 +1,6 @@
 import joblib
 import logging
+import openml
 import openmldefaults
 import os
 import pickle
@@ -79,6 +80,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                    consider_runtime: bool,
                                    consider_a3r: bool,
                                    task_limit: int,
+                                   run_on_surrogate: bool,
                                    output_directory: str):
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
@@ -161,18 +163,39 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                         str(normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
-        result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize))
+        result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize))
+        result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize))
 
         result = generate_defaults_discretized(config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], False)
         with open(result_filepath_defaults, 'wb') as fp:
             pickle.dump(result, fp, protocol=0)
         logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
-        openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
-                                                           config_frame_te[usercpu_time] if consider_runtime else None,
-                                                           task_id,
-                                                           result['indices'],
-                                                           scoring,
-                                                           usercpu_time,
-                                                           minimize_measure,
-                                                           result_filepath_results)
-        logging.info('results generated, saved to: %s' % result_filepath_results)
+        if run_on_surrogate:
+            openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
+                                                               config_frame_te[usercpu_time] if consider_runtime else None,
+                                                               task_id,
+                                                               result['indices'],
+                                                               scoring,
+                                                               usercpu_time,
+                                                               minimize_measure,
+                                                               result_filepath_surrogated)
+            logging.info('results generated, saved to: %s' % result_filepath_surrogated)
+        else:  # run on live
+            task = openml.tasks.get_task(task_id)
+            X, y = task.get_X_and_y()
+            dataset = task.get_dataset()
+            nominal_indices = dataset.get_features_by_type('nominal', [task.target_name])
+            numeric_indices = dataset.get_features_by_type('numeric', [task.target_name])
+
+            res = openmldefaults.search.convert_defaults_to_multiple_param_grids(result['defaults'],
+                                                                                 'classifier',
+                                                                                 search_space_identifier,
+                                                                                 numeric_indices=numeric_indices,
+                                                                                 nominal_indices=nominal_indices)
+            classifiers, param_grids = res
+            search = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
+                                                                    cv=3, n_jobs=1, verbose=False,
+                                                                    scoring='accuracy', maximize=True)
+            search.fit(X, y)
+
+            logging.info('results generated, saved to: %s' % result_filepath_live)

@@ -4,7 +4,9 @@ from . import random_forest
 from . import svc
 
 import ConfigSpace
+import importlib
 import openmldefaults
+import sklearn
 import sklearnbot
 import typing
 
@@ -35,3 +37,22 @@ def get_config_spaces(classifier_names: typing.List[str], random_seed: int, spac
                                    sub_space,
                                    parent_hyperparameter=parent_hyperparameter)
     return cs
+
+
+def reinstantiate_model(classifier_name: str, search_space_identifier: typing.Optional[str],
+                        numeric_indices: typing.List[int],
+                        nominal_indices: typing.List[int]) -> sklearn.base.BaseEstimator:
+    config_space = get_config_space(classifier_name, 0, search_space_identifier)
+    if search_space_identifier == 'sklearn_0_19':
+        import openmlstudy14
+        module_name = config_space.name.rsplit('.', 1)
+        model_class = getattr(importlib.import_module(module_name[0]),
+                              module_name[1])
+        clf = openmlstudy14.pipeline.EstimatorFactory._get_pipeline(nominal_indices=nominal_indices,
+                                                                    numeric_indices=numeric_indices,
+                                                                    model_class=model_class)
+        if config_space.meta is not None:
+            clf.set_params(**config_space.meta)
+        return clf
+    else:
+        return sklearnbot.sklearn.as_estimator(config_space, numeric_indices, nominal_indices)

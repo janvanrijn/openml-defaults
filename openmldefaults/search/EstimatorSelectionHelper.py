@@ -7,7 +7,7 @@ from sklearn.model_selection import GridSearchCV
 # code adjusted from: http://www.davidsbatista.net/blog/2018/02/23/model_optimization/
 class EstimatorSelectionHelper:
 
-    def __init__(self, models, params):
+    def __init__(self, models, params, cv, n_jobs, verbose, scoring, maximize):
         if not set(models.keys()).issubset(set(params.keys())):
             missing_params = list(set(models.keys()) - set(params.keys()))
             raise ValueError("Some estimators are missing parameters: %s" % missing_params)
@@ -15,16 +15,19 @@ class EstimatorSelectionHelper:
         self.params = params
         self.keys = models.keys()
         self.grid_searches = {}
-        self.maximize = None
-
-    def fit(self, X, y, cv, n_jobs, verbose, scoring, maximize):
         self.maximize = maximize
+        self.cv = cv
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+        self.scoring = scoring
+
+    def fit(self, X, y):
         for key in self.keys:
             model = self.models[key]
             params = self.params[key]
             # unfortunately, we have to refit all ..
-            gs = GridSearchCV(model, params, cv=cv, n_jobs=n_jobs,
-                              verbose=verbose, scoring=scoring, refit=True,
+            gs = GridSearchCV(model, params, cv=self.cv, n_jobs=self.n_jobs,
+                              verbose=self.verbose, scoring=self.scoring, refit=True,
                               return_train_score=True)
             gs.fit(X, y)
             self.grid_searches[key] = gs

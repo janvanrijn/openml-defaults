@@ -1,2 +1,2 @@
-from .default_search import convert_defaults_to_param_grid
+from .default_search import convert_defaults_to_param_grid, convert_defaults_to_multiple_param_grids
 from .EstimatorSelectionHelper import EstimatorSelectionHelper
