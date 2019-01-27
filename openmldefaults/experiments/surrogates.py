@@ -133,11 +133,11 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                         surrogate_n_estimators,
                                                         random_seed)
         frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, tasks_tr, config_space, configurations, normalize, None, -1)
+            surrogates, tasks_tr, config_space, configurations, normalize, None, None)
         config_frame_tr[measure] = frame_tr
         # NEVER! Normalize the test frame
         frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, tasks_te, config_space, configurations, None, None, -1)
+            surrogates, tasks_te, config_space, configurations, None, None, None)
         config_frame_te[measure] = frame_te
         logging.info('Ranges test task %d for measure %s [%f-%f]:' % (task_id,
                                                                       measure,
@@ -192,10 +192,12 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                                                  search_space_identifier,
                                                                                  numeric_indices=numeric_indices,
                                                                                  nominal_indices=nominal_indices)
+
             classifiers, param_grids = res
             search = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
                                                                     cv=3, n_jobs=1, verbose=False,
-                                                                    scoring='accuracy', maximize=True)
+                                                                    scoring=sklearn_measure,
+                                                                    maximize=sklearn_maximize)
             search.fit(X, y)
 
             logging.info('results generated, saved to: %s' % result_filepath_live)

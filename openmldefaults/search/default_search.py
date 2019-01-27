@@ -1,6 +1,7 @@
 import openmldefaults
 import typing
 import sklearn.pipeline
+import sklearnbot
 
 
 def convert_defaults_to_param_grid(defaults: typing.List[typing.Dict[str, typing.Union[str, int, bool, float]]]) \
@@ -37,9 +38,7 @@ def convert_defaults_to_multiple_param_grids(defaults: typing.List[typing.Dict[s
             param_grids[classifier] = list()
         param_grids[classifier].append(current)
     for key in param_grids:
+        config_space = openmldefaults.config_spaces.get_config_space(key, 0, search_space_identifier)
         param_grids[key] = convert_defaults_to_param_grid(param_grids[key])
-        classifiers[key] = openmldefaults.config_spaces.reinstantiate_model(key,
-                                                                            search_space_identifier,
-                                                                            nominal_indices=nominal_indices,
-                                                                            numeric_indices=numeric_indices)
+        classifiers[key] = sklearnbot.sklearn.as_estimator(config_space, numeric_indices, nominal_indices)
     return classifiers, param_grids

@@ -1,5 +1,6 @@
-import pandas as pd
+import logging
 import numpy as np
+import pandas as pd
 
 from sklearn.model_selection import GridSearchCV
 
@@ -25,6 +26,7 @@ class EstimatorSelectionHelper:
         for key in self.keys:
             model = self.models[key]
             params = self.params[key]
+            logging.info('fitting %s with grid %s' % (key, params))
             # unfortunately, we have to refit all ..
             gs = GridSearchCV(model, params, cv=self.cv, n_jobs=self.n_jobs,
                               verbose=self.verbose, scoring=self.scoring, refit=True,

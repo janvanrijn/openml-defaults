@@ -109,3 +109,10 @@ def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
             raise ValueError('Not enough curve points')
         results_vanilla.append(current_vanilla)
     return pd.DataFrame(results_vanilla), pd.DataFrame(results_curves)
+
+
+def openml_measure_to_sklearn(openml_measure: str) -> typing.Tuple[str, bool]:
+    if openml_measure == 'predictive_accuracy':
+        return 'accuracy', True
+    else:
+        raise ValueError('Unimplemented measure')
