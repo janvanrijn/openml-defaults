@@ -57,7 +57,9 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
             surrogates, task_ids, config_space, configurations, None, None, -1)
 
     for task_id in task_ids:
-        result_directory = os.path.join(output_directory, classifier_identifier, str(int(task_id)), strategy_name, str(random_seed))
+        result_directory = os.path.join(output_directory, classifier_identifier,
+                                        str(int(task_id)), strategy_name,
+                                        str(n_defaults), str(random_seed))
         result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize_measure))
         openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
                                                            config_frame[usercpu_time] if consider_runtime else None,
@@ -159,7 +161,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         logging.info('Started measure %s, minimize: %d' % (measure, minimize))
         strategy = '%s_%s' % ('min' if minimize else 'max', measure)
         result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy,
-                                        str(random_seed), aggregate, str(a3r_r), str(normalize_base),
+                                        str(n_defaults), str(random_seed), aggregate, str(a3r_r), str(normalize_base),
                                         str(normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
@@ -194,6 +196,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                                                  nominal_indices=nominal_indices)
 
             classifiers, param_grids = res
+            sklearn_measure, sklearn_maximize = openmldefaults.utils.openml_measure_to_sklearn(scoring)
             search = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
                                                                     cv=3, n_jobs=1, verbose=False,
                                                                     scoring=sklearn_measure,

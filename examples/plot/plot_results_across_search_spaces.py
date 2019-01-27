@@ -27,17 +27,19 @@ def run(args):
 
     folder_constraints = {
         2: ['max_predictive_accuracy'],
-        3: ['0']
+        3: ['32'],
+        4: ['0']
     }
     folder_legend = {
         'folder_depth_0': 'search_space',
         'folder_depth_1': 'task_id',
         'folder_depth_2': 'strategy',
-        'folder_depth_3': 'random_seed',
-        'folder_depth_4': 'param_aggregate',
-        'folder_depth_5': 'param_a3r_r',
-        'folder_depth_6': 'param_normalize_base',
-        'folder_depth_7': 'param_normalize_a3r',
+        'folder_depth_3': 'num_defaults_scheduled',
+        'folder_depth_4': 'random_seed',
+        'folder_depth_5': 'param_aggregate',
+        'folder_depth_6': 'param_a3r_r',
+        'folder_depth_7': 'param_normalize_base',
+        'folder_depth_8': 'param_normalize_a3r',
     }
 
     result_total = None

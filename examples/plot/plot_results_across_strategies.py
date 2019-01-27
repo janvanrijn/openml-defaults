@@ -22,7 +22,7 @@ def parse_args():
 EXPECTED_DATASETS = 99
 EXPECTED_STRATEGIES = 3
 ALL_BUDGETS = [1, 2, 4, 8, 16, 32]
-STRICT_CHECK = False
+STRICT_CHECK = True
 
 
 def filter_frame(df: pd.DataFrame, filters: typing.Dict):
@@ -83,20 +83,22 @@ def run(args):
     usercpu_time = 'usercpu_time_millis'
     result_total = None
     folder_constraints = {
-        2: ['42'],
-        3: ['sum'],
-        4: ['1'],
-        5: ['None'],
-        6: ['None']
+        2: ['32'],
+        3: ['42'],
+        4: ['median'],
+        5: ['1'],
+        6: ['MinMaxScaler'],
+        7: ['StandardScaler']
     }
     folder_legend = {
         'folder_depth_0': 'task_id',
         'folder_depth_1': 'strategy',
-        'folder_depth_2': 'random_seed',
-        'folder_depth_3': 'param_aggregate',
-        'folder_depth_4': 'param_a3r_r',
-        'folder_depth_5': 'param_normalize_base',
-        'folder_depth_6': 'param_normalize_a3r',
+        'folder_depth_2': 'n_defaults_max',
+        'folder_depth_3': 'random_seed',
+        'folder_depth_4': 'param_aggregate',
+        'folder_depth_5': 'param_a3r_r',
+        'folder_depth_6': 'param_normalize_base',
+        'folder_depth_7': 'param_normalize_a3r',
     }
     # folder_constraints = None
     results_directory = os.path.join(args.results_directory, args.classifier_name)
