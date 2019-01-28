@@ -4,6 +4,7 @@ import logging
 import seaborn as sns
 import openmldefaults
 import os
+import pandas as pd
 
 
 def parse_args():
@@ -22,6 +23,7 @@ STRICT_CHECK = False
 
 
 def run(args):
+    pd.options.mode.chained_assignment = 'raise'
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
@@ -76,13 +78,21 @@ def run(args):
             raise ValueError('Expected at most 2 values for column %s. Got %s' % (column,
                                                                                   result_total[column].unique()))
 
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 6))
+    result_total_normalized = openmldefaults.utils.normalize_df_conditioned_on(result_total,
+                                                                               'MinMaxScaler',
+                                                                               args.scoring,
+                                                                               'task_id')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
     # absolute plots
     sns.boxplot(x="budget", y=args.scoring, hue="search_space", data=result_total, ax=ax1)
+    ax1.set_title("vanilla")
+    sns.boxplot(x="budget", y=args.scoring, hue="search_space", data=result_total_normalized, ax=ax2)
+    ax2.set_title("normalized (per task)")
 
     os.makedirs(args.output_directory, exist_ok=True)
     output_file = os.path.join(args.output_directory, 'results_across_search_spaces.png')
+    # ax1.set_yscale('log')
     plt.savefig(output_file)
     logging.info('stored figure to %s' % output_file)
 

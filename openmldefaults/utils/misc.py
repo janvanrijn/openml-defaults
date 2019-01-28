@@ -27,10 +27,10 @@ def _traverse_run_folders(folder: str, n_defaults: int, traversed_directories: t
         depth = len(traversed_directories) + 1
         logging.info('-' * depth + ': ' + folder)
     folder_content = os.listdir(folder)
-    if 'results_%d_1.csv' % n_defaults in folder_content:
-        return [traversed_directories + ['results_%d_1.csv' % n_defaults]]
-    elif 'results_%d_0.csv' % n_defaults in folder_content:
-        return [traversed_directories + ['results_%d_0.csv' % n_defaults]]
+    if 'surrogated_%d_1.csv' % n_defaults in folder_content:
+        return [traversed_directories + ['surrogated_%d_1.csv' % n_defaults]]
+    elif 'surrogated_%d_0.csv' % n_defaults in folder_content:
+        return [traversed_directories + ['surrogated_%d_0.csv' % n_defaults]]
     else:
         depth = len(traversed_directories)
         results = []

@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument('--n_defaults', type=int, default=32)
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--minimum_evals', type=int, default=128)
-    parser.add_argument('--random_iterations', type=int, default=16)
+    parser.add_argument('--random_iterations', type=int, default=1)
     parser.add_argument('--run_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     args_ = parser.parse_args()

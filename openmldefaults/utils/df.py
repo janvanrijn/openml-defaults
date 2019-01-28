@@ -33,6 +33,24 @@ def normalize_df_columnwise(df: pd.DataFrame, scaling_type: typing.Optional[str]
     return df
 
 
+def normalize_df_conditioned_on(df_orig: pd.DataFrame,
+                                scaling_type: typing.Optional[str],
+                                scaling_col: str,
+                                conditioned_on: str) -> pd.DataFrame:
+    logging.info('scaling dataframe (no specific measure indicated) with %s' % scaling_type)
+    df_copy = df_orig.copy(True)
+    if scaling_type is None:
+        return df_copy
+    if scaling_col == conditioned_on:
+        raise ValueError('Scaling column and conditioned on column can not be the same. ')
+    scaler = get_scaler(scaling_type)
+    for value in df_orig[conditioned_on].unique():
+        array = df_orig.loc[df_orig[conditioned_on] == value][scaling_col].values
+        res = scaler.fit_transform(array.reshape(-1, 1))[:, 0]
+        df_copy.loc[df_orig[conditioned_on] == value, scaling_col] = res
+    return df_copy
+
+
 def create_a3r_frame(scoring_frame: pd.DataFrame, runtime_frame: pd.DataFrame, a3r_r: int) -> pd.DataFrame:
     """
     Replaces all occurrences of zero in the runtime frame with the min val (to
