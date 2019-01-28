@@ -1,3 +1,4 @@
+import ConfigSpace
 import logging
 import openmldefaults
 import pandas as pd
@@ -12,6 +13,7 @@ class GreedyDefaults(object):
 
     def generate_defaults_discretized(self, df: pd.DataFrame, num_defaults: int,
                                       minimize: bool, aggregate: typing.Callable,
+                                      config_space: ConfigSpace.ConfigurationSpace,
                                       raise_no_improvement: bool):
         """
         Takes a data frame with a discretized set of defaults and returns the
@@ -34,6 +36,10 @@ class GreedyDefaults(object):
 
         aggregate: callable
             function to aggregate per task results
+
+        config_space: ConfigurationSpace
+            the configuration space object corresponding to the defaults. Will
+            be used casting defaults to the right data type.
 
         raise_no_improvement: bool
             if true, an error will be raised if no improvement is obtained
@@ -76,7 +82,7 @@ class GreedyDefaults(object):
             selected_configs.append(best_addition)
             selected_indices.append(best_index)
 
-        selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx) for idx in selected_indices]
+        selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx, config_space) for idx in selected_indices]
         logging.info(selected_defaults)
 
         runtime = time.time() - start_time

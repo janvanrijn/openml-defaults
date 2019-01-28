@@ -1,5 +1,11 @@
+import ConfigSpace
+import numpy as np
+import openmlcontrib
+import pandas as pd
+import typing
 
-def selected_row_to_config_dict(df, row_idx):
+
+def selected_row_to_config_dict(df: pd.DataFrame, row_idx: int, config_space: ConfigSpace.ConfigurationSpace) -> typing.Dict:
     values = df.index[row_idx]
     if len(values) > 1:
         keys = df.index.names
@@ -9,5 +15,11 @@ def selected_row_to_config_dict(df, row_idx):
         raise ValueError('data frame index not interpreted properly')
     if len(keys) != len(values):
         raise ValueError()
-    result = {keys[i]: values[i] for i in range(len(values))}
+    result = dict()
+    for name, value in zip(keys, values):
+        dtype_callable = openmlcontrib.legacy.get_hyperparameter_datatype(config_space.get_hyperparameter(name))
+        if isinstance(value, float) and np.isnan(value):
+            result[name] = np.nan
+        else:
+            result[name] = dtype_callable(value)
     return result
