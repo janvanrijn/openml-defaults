@@ -31,10 +31,6 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     measures = [scoring]
     if consider_runtime:
         measures = [scoring, usercpu_time]
-    # joblib speed ups
-    memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
-    metadata_files_to_frame = memory.cache(openmldefaults.utils.metadata_files_to_frame)
-    generate_surrogates_using_metadata = memory.cache(openmldefaults.utils.generate_surrogates_using_metadata)
 
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
     classifier_identifier = '__'.join(sorted(classifier_names))
@@ -43,18 +39,18 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_defaults)]
-    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, measures)
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures)
     task_ids = list(metadata_frame['task_id'].unique())
 
     config_frame = dict()
     for measure in measures:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates, columns = generate_surrogates_using_metadata(metadata_frame,
-                                                                 config_space,
-                                                                 measure,
-                                                                 surrogate_minimum_evals,
-                                                                 surrogate_n_estimators,
-                                                                 random_seed)
+        surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(metadata_frame,
+                                                                                      config_space,
+                                                                                      measure,
+                                                                                      surrogate_minimum_evals,
+                                                                                      surrogate_n_estimators,
+                                                                                      random_seed)
         config_frame[measure] = openmldefaults.utils.generate_dataset_using_surrogates(
             surrogates, columns, task_ids, config_space, configurations, None, None, -1)
 
@@ -100,19 +96,13 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
     if consider_runtime:
         measures = [scoring, usercpu_time]
 
-    # joblib speed ups
-    memory = joblib.Memory(location=os.path.join(output_directory, '.cache'), verbose=0)
-    metadata_files_to_frame = memory.cache(openmldefaults.utils.metadata_files_to_frame)
-    generate_surrogates_using_metadata = memory.cache(openmldefaults.utils.generate_surrogates_using_metadata)
-    generate_defaults_discretized = memory.cache(model.generate_defaults_discretized)
-
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
     classifier_identifier = '__'.join(sorted(classifier_names))
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_configurations)]
-    metadata_frame = metadata_files_to_frame(metadata_files, search_space_identifier, measures)
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures)
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
@@ -130,12 +120,12 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         measures_normalize.append((usercpu_time, normalize_base))
     for measure, normalize in measures_normalize:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates, columns = generate_surrogates_using_metadata(metadata_frame,
-                                                                 config_space,
-                                                                 measure,
-                                                                 surrogate_minimum_evals,
-                                                                 surrogate_n_estimators,
-                                                                 random_seed)
+        surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(metadata_frame,
+                                                                                      config_space,
+                                                                                      measure,
+                                                                                      surrogate_minimum_evals,
+                                                                                      surrogate_n_estimators,
+                                                                                      random_seed)
         frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
             surrogates, columns, tasks_tr, config_space, configurations, normalize, None, None)
         config_frame_tr[measure] = frame_tr
@@ -175,12 +165,12 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                 result_defaults = pickle.load(fp)
             logging.info('defaults loaded, loaded from: %s' % result_filepath_defaults)
         else:
-            result_defaults = generate_defaults_discretized(config_frame_tr[measure],
-                                                            n_defaults,
-                                                            minimize,
-                                                            AGGREGATES[aggregate],
-                                                            config_space,
-                                                            False)
+            result_defaults = model.generate_defaults_discretized(config_frame_tr[measure],
+                                                                  n_defaults,
+                                                                  minimize,
+                                                                  AGGREGATES[aggregate],
+                                                                  config_space,
+                                                                  False)
             with open(result_filepath_defaults, 'wb') as fp:
                 pickle.dump(result_defaults, fp, protocol=0)
             logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
