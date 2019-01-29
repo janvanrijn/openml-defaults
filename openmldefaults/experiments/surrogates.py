@@ -1,9 +1,11 @@
 import joblib
 import logging
+import numpy as np
 import openml
 import openmldefaults
 import os
 import pickle
+import sklearn.model_selection
 import statistics
 import typing
 
@@ -23,6 +25,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                  surrogate_minimum_evals: int,
                                  consider_runtime: bool,
                                  output_directory: str):
+    np.random.seed(random_seed)
     logging.info('Starting Random Search Experiment')
     usercpu_time = 'usercpu_time_millis'
     measures = [scoring]
@@ -46,15 +49,14 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     config_frame = dict()
     for measure in measures:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates = generate_surrogates_using_metadata(metadata_frame,
-                                                        configurations,
-                                                        config_space,
-                                                        measure,
-                                                        surrogate_minimum_evals,
-                                                        surrogate_n_estimators,
-                                                        random_seed)
+        surrogates, columns = generate_surrogates_using_metadata(metadata_frame,
+                                                                 config_space,
+                                                                 measure,
+                                                                 surrogate_minimum_evals,
+                                                                 surrogate_n_estimators,
+                                                                 random_seed)
         config_frame[measure] = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, task_ids, config_space, configurations, None, None, -1)
+            surrogates, columns, task_ids, config_space, configurations, None, None, -1)
 
     for task_id in task_ids:
         result_directory = os.path.join(output_directory, classifier_identifier,
@@ -84,6 +86,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                    task_limit: int,
                                    run_on_surrogate: bool,
                                    output_directory: str):
+    np.random.seed(random_seed)
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
     if consider_a3r and not consider_runtime:
@@ -127,19 +130,18 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         measures_normalize.append((usercpu_time, normalize_base))
     for measure, normalize in measures_normalize:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates = generate_surrogates_using_metadata(metadata_frame,
-                                                        configurations,
-                                                        config_space,
-                                                        measure,
-                                                        surrogate_minimum_evals,
-                                                        surrogate_n_estimators,
-                                                        random_seed)
+        surrogates, columns = generate_surrogates_using_metadata(metadata_frame,
+                                                                 config_space,
+                                                                 measure,
+                                                                 surrogate_minimum_evals,
+                                                                 surrogate_n_estimators,
+                                                                 random_seed)
         frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, tasks_tr, config_space, configurations, normalize, None, None)
+            surrogates, columns, tasks_tr, config_space, configurations, normalize, None, None)
         config_frame_tr[measure] = frame_tr
         # NEVER! Normalize the test frame
         frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, tasks_te, config_space, configurations, None, None, None)
+            surrogates, columns, tasks_te, config_space, configurations, None, None, None)
         config_frame_te[measure] = frame_te
         logging.info('Ranges test task %d for measure %s [%f-%f]:' % (task_id,
                                                                       measure,
@@ -168,39 +170,58 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize))
         result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize))
 
-        result = generate_defaults_discretized(config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], False)
-        with open(result_filepath_defaults, 'wb') as fp:
-            pickle.dump(result, fp, protocol=0)
-        logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
+        if os.path.isfile(result_filepath_defaults):
+            with open(result_filepath_defaults, 'rb') as fp:
+                result_defaults = pickle.load(fp)
+            logging.info('defaults loaded, loaded from: %s' % result_filepath_defaults)
+        else:
+            result_defaults = generate_defaults_discretized(config_frame_tr[measure],
+                                                            n_defaults,
+                                                            minimize,
+                                                            AGGREGATES[aggregate],
+                                                            config_space,
+                                                            False)
+            with open(result_filepath_defaults, 'wb') as fp:
+                pickle.dump(result_defaults, fp, protocol=0)
+            logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
+
         if run_on_surrogate:
-            openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
-                                                               config_frame_te[usercpu_time] if consider_runtime else None,
-                                                               task_id,
-                                                               result['indices'],
-                                                               scoring,
-                                                               usercpu_time,
-                                                               minimize_measure,
-                                                               result_filepath_surrogated)
-            logging.info('results generated, saved to: %s' % result_filepath_surrogated)
+            if not os.path.exists(result_filepath_surrogated):
+                openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
+                                                                   config_frame_te[usercpu_time] if consider_runtime else None,
+                                                                   task_id,
+                                                                   result_defaults['indices'],
+                                                                   scoring,
+                                                                   usercpu_time,
+                                                                   minimize_measure,
+                                                                   result_filepath_surrogated)
+                logging.info('surrogated results generated, saved to: %s' % result_filepath_surrogated)
+            else:
+                logging.info('surrogated results already exists, see: %s' % result_filepath_surrogated)
         else:  # run on live
-            task = openml.tasks.get_task(task_id)
-            X, y = task.get_X_and_y()
-            dataset = task.get_dataset()
-            nominal_indices = dataset.get_features_by_type('nominal', [task.target_name])
-            numeric_indices = dataset.get_features_by_type('numeric', [task.target_name])
+            if not os.path.exists(result_filepath_live):
+                task = openml.tasks.get_task(task_id)
+                X, y = task.get_X_and_y()
+                dataset = task.get_dataset()
+                nominal_indices = dataset.get_features_by_type('nominal', [task.target_name])
+                numeric_indices = dataset.get_features_by_type('numeric', [task.target_name])
 
-            res = openmldefaults.search.convert_defaults_to_multiple_param_grids(result['defaults'],
-                                                                                 'classifier',
-                                                                                 search_space_identifier,
-                                                                                 numeric_indices=numeric_indices,
-                                                                                 nominal_indices=nominal_indices)
-
-            classifiers, param_grids = res
-            sklearn_measure, sklearn_maximize = openmldefaults.utils.openml_measure_to_sklearn(scoring)
-            search = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
-                                                                    cv=3, n_jobs=1, verbose=False,
-                                                                    scoring=sklearn_measure,
-                                                                    maximize=sklearn_maximize)
-            search.fit(X, y)
-
-            logging.info('results generated, saved to: %s' % result_filepath_live)
+                res = openmldefaults.search.convert_defaults_to_multiple_param_grids(result_defaults['defaults'],
+                                                                                     'classifier',
+                                                                                     search_space_identifier,
+                                                                                     numeric_indices=numeric_indices,
+                                                                                     nominal_indices=nominal_indices)
+                classifiers, param_grids = res
+                sklearn_measure, sklearn_maximize = openmldefaults.utils.openml_measure_to_sklearn(scoring)
+                search_clf = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
+                                                                            cv=3, n_jobs=1, verbose=True,
+                                                                            scoring=sklearn_measure,
+                                                                            maximize=sklearn_maximize)
+                scores = sklearn.model_selection.cross_val_score(search_clf, X, y,
+                                                                 scoring=sklearn_measure,
+                                                                 cv=10, verbose=1)
+                with open(result_filepath_live, 'wb') as fp:
+                    pickle.dump(scores, fp, protocol=0)
+                logging.info('live results generated, saved to: %s' % result_filepath_live)
+            else:
+                logging.info('live results already exists, see: %s' % result_filepath_live)

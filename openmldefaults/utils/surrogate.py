@@ -184,6 +184,7 @@ def train_surrogate_on_task(task_id: int,
 
 def generate_dataset_using_surrogates(
         surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
+        surrogate_columns: np.array,
         task_ids: typing.List[int],
         config_space: ConfigSpace.ConfigurationSpace,
         configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
@@ -199,7 +200,9 @@ def generate_dataset_using_surrogates(
     ----------
     surrogates: dict[str, RegressorMixin]
         A dictionary mapping from task id to a surrogate
-    task_ids: list:
+    surrogate_columns: np.array
+        An array of the columns expected by the surrogates
+    task_ids: list
         A list of tasks to include in the resulting frame (note that each
         task must be a key in the surrogates dict, or an error will be thrown)
     config_space: ConfigSpace.ConfigurationSpace
@@ -223,16 +226,29 @@ def generate_dataset_using_surrogates(
         A dataframe with all configurations set to the index, and all tasks as
         columns.
     """
+    def complete_dataframe(df_: pd.DataFrame) -> pd.DataFrame:
+        for column_ in surrogate_columns:
+            if column_ not in df_:
+                impute_value = np.nan
+                logging.info('Adding column to meta-dataset: %s. Imputing with %s' % (column_, impute_value))
+                df_[column_] = impute_value
+        # reorders columns to order required for surrogate (if columns were added)
+        df_ = df_[surrogate_columns]
+        return df_
+
     for configuration in configurations:
         illegal = set(configuration.keys()) - set(config_space.get_hyperparameter_names())
         if len(illegal) > 0:
             raise ValueError('Configuration contains illegal hyperparameters: %s' % illegal)
 
     df_orig = pd.DataFrame(configurations)
-    logging.info('Meta-dataset dimensions: %s' % str(df_orig.shape))
+    # adds missing columns and reorders
+    df_orig = complete_dataframe(df_orig)
 
     # copy of df_orig. Prevent copy function for correct type hints
     df_surrogate = pd.DataFrame(configurations)
+    # adds missing columns and reorders
+    df_surrogate = complete_dataframe(df_surrogate)
     for task_id in task_ids:
         surrogate_values = surrogates[task_id].predict(df_orig.values)
         if scaler_type is not None:
@@ -243,7 +259,6 @@ def generate_dataset_using_surrogates(
         if column_prefix:
             column_name = '%s_%s' % (column_prefix, column_name)
         df_surrogate[column_name] = surrogate_values
-
     if df_surrogate.shape[0] != len(configurations):
         raise ValueError('surrogate frame has wrong number of instances. Expected: %d Got %d' % (len(configurations),
                                                                                                  df_surrogate.shape[0]))
@@ -255,12 +270,11 @@ def generate_dataset_using_surrogates(
 
 def generate_surrogates_using_metadata(
         metadata_frame: pd.DataFrame,
-        configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
         config_space: ConfigSpace.ConfigurationSpace,
         scoring: str,
         minimum_evals: int,
         n_estimators: int,
-        random_seed: int) -> typing.Dict[int, sklearn.pipeline.Pipeline]:
+        random_seed: int) -> typing.Tuple[typing.Dict[int, sklearn.pipeline.Pipeline], np.array]:
     """
     Generates a data frame where each row represents a configuration, each
     column represents an openml task and each cell represents the scoring of
@@ -271,9 +285,6 @@ def generate_surrogates_using_metadata(
     metadata_frame: pd.Dataframe
         A dataframe with columns for all hyperparameters, a column indicating the
         task and a column indicating the scoring
-    configurations: List[Dict[str, mixed]]
-        A list of dicts, each dict mapping from hyperparameter name to
-        hyperparameter value
     config_space: ConfigSpace.ConfigurationSpace
         Determines which hyperparameters are relevant
     scoring: str
@@ -287,13 +298,18 @@ def generate_surrogates_using_metadata(
 
     Returns
     -------
-    pd.DataFrame
-        A dataframe with all configurations set to the index, and all tasks as
-        columns.
+    surrogates: dict[int, Pipeline]
+        A dictionary mapping from task id to the surrogate on that task
+    columns_original: np.array
+        The columns that are expected to train a surrogate on (same for all
+        surrogates)
     """
     surrogates = dict()
-    df_orig = pd.DataFrame(configurations)
     task_ids = metadata_frame['task_id'].unique()
+    columns_original = None
+    if len(task_ids) == 0:
+        raise ValueError()
+
     for task_id in task_ids:
         setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
         if len(setup_frame) < minimum_evals:
@@ -307,11 +323,15 @@ def generate_surrogates_using_metadata(
                                                                           False,  # we will normalize predictions
                                                                           n_estimators,
                                                                           random_seed)
-        if not np.array_equal(df_orig.columns.values, columns):
+        if columns_original is None:
+            columns_original = columns
+        if not np.array_equal(columns_original, columns):
             # if this goes wrong, it is due to the pd.get_dummies() fn
-            raise ValueError('Column sets not equal: %s vs %s' % (df_orig.columns.values, columns))
+            missing = set(columns_original) - set(columns)
+            over = set(columns) - set(columns_original)
+            raise ValueError('Column sets not equal. Missing: %s; over: %s' % (missing, over))
         surrogates[task_id] = estimator
-    return surrogates
+    return surrogates, columns_original
 
 
 def metadata_files_to_frame(metadata_files: typing.List[str],

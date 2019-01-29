@@ -1,12 +1,12 @@
 import logging
 import numpy as np
 import pandas as pd
-
-from sklearn.model_selection import GridSearchCV
+import sklearn.base
+import sklearn.model_selection
 
 
 # code adjusted from: http://www.davidsbatista.net/blog/2018/02/23/model_optimization/
-class EstimatorSelectionHelper:
+class EstimatorSelectionHelper(sklearn.base.BaseEstimator):
 
     def __init__(self, models, params, cv, n_jobs, verbose, scoring, maximize):
         if not set(models.keys()).issubset(set(params.keys())):
@@ -23,18 +23,23 @@ class EstimatorSelectionHelper:
         self.scoring = scoring
 
     def fit(self, X, y):
-        for key in self.keys:
+        for idx, key in enumerate(self.keys):
             model = self.models[key]
             params = self.params[key]
-            logging.info('fitting %s with grid %s' % (key, params))
+            if self.verbose:
+                logging.info('fitting %s with grid size %d (%d/%d)' % (key, len(params), idx + 1, len(self.keys)))
             # unfortunately, we have to refit all ..
-            gs = GridSearchCV(model, params, cv=self.cv, n_jobs=self.n_jobs,
-                              verbose=self.verbose, scoring=self.scoring, refit=True,
-                              return_train_score=True)
+            gs = sklearn.model_selection.GridSearchCV(model, params,
+                                                      cv=self.cv,
+                                                      n_jobs=self.n_jobs,
+                                                      verbose=self.verbose,
+                                                      scoring=self.scoring,
+                                                      refit=True,
+                                                      return_train_score=True)
             gs.fit(X, y)
             self.grid_searches[key] = gs
 
-    def precict(self, X):
+    def predict(self, X):
         return self.grid_searches[self._best_estimator(self.maximize)].best_estimator_.predict(X)
 
     def score_summary(self, sort_by='mean_score'):

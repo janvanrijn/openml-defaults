@@ -19,7 +19,12 @@ def selected_row_to_config_dict(df: pd.DataFrame, row_idx: int, config_space: Co
     for name, value in zip(keys, values):
         dtype_callable = openmlcontrib.legacy.get_hyperparameter_datatype(config_space.get_hyperparameter(name))
         if isinstance(value, float) and np.isnan(value):
-            result[name] = np.nan
+            # JvR: I think it's never good to add a NaN to a parameter grid
+            # It usually indicates a inactive hyperparameter, and when added
+            # explicitly it can crash other libraries (SVC degree)
+            # Although there are exceptions where the NaN is actually an
+            # active hyperparameter (Imputer) we won't need it on the param grid
+            pass
         else:
             result[name] = dtype_callable(value)
     return result
