@@ -61,6 +61,7 @@ def run(args):
             surrogate_n_estimators=args.n_estimators,
             surrogate_minimum_evals=args.minimum_evals,
             consider_runtime=False,
+            run_on_surrogate=args.run_on_surrogates,
             output_directory=args.output_directory
         )
 

@@ -18,12 +18,37 @@ AGGREGATES = {
 }
 
 
+def get_scores_live(task_id: int, defaults: typing.List[typing.Dict], search_space_identifier: str, scoring: str):
+    task = openml.tasks.get_task(task_id)
+    X, y = task.get_X_and_y()
+    dataset = task.get_dataset()
+    nominal_indices = dataset.get_features_by_type('nominal', [task.target_name])
+    numeric_indices = dataset.get_features_by_type('numeric', [task.target_name])
+
+    res = openmldefaults.search.convert_defaults_to_multiple_param_grids(defaults,
+                                                                         'classifier',
+                                                                         search_space_identifier,
+                                                                         numeric_indices=numeric_indices,
+                                                                         nominal_indices=nominal_indices)
+    classifiers, param_grids = res
+    sklearn_measure, sklearn_maximize = openmldefaults.utils.openml_measure_to_sklearn(scoring)
+    search_clf = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
+                                                                cv=3, n_jobs=1, verbose=True,
+                                                                scoring=sklearn_measure,
+                                                                maximize=sklearn_maximize)
+    scores = sklearn.model_selection.cross_val_score(search_clf, X, y,
+                                                     scoring=sklearn_measure,
+                                                     cv=10, verbose=1)
+    return scores
+
+
 def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: int,
                                  search_space_identifier: str, scoring: str,
                                  minimize_measure: bool, n_defaults: int,
                                  surrogate_n_estimators: int,
                                  surrogate_minimum_evals: int,
                                  consider_runtime: bool,
+                                 run_on_surrogate: bool,
                                  output_directory: str):
     np.random.seed(random_seed)
     logging.info('Starting Random Search Experiment')
@@ -58,15 +83,31 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
         result_directory = os.path.join(output_directory, classifier_identifier,
                                         str(int(task_id)), strategy_name,
                                         str(n_defaults), str(random_seed))
-        result_filepath_results = os.path.join(result_directory, 'results_%d_%d.csv' % (n_defaults, minimize_measure))
-        openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
-                                                           config_frame[usercpu_time] if consider_runtime else None,
-                                                           task_id,
-                                                           list(range(n_defaults)),
-                                                           scoring,
-                                                           usercpu_time,
-                                                           minimize_measure,
-                                                           result_filepath_results)
+        result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize_measure))
+        result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize_measure))
+        if run_on_surrogate:
+            if not os.path.exists(result_filepath_surrogated):
+                openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
+                                                                   config_frame[usercpu_time] if consider_runtime else None,
+                                                                   task_id,
+                                                                   list(range(n_defaults)),
+                                                                   scoring,
+                                                                   usercpu_time,
+                                                                   minimize_measure,
+                                                                   result_filepath_surrogated)
+                logging.info('surrogated random search results generated, saved to: %s' % result_filepath_surrogated)
+            else:
+                logging.info('surrogated random search results already exists, see: %s' % result_filepath_surrogated)
+        else:
+            print(config_frame[scoring].index.tolist())
+            if not os.path.exists(result_filepath_live):
+                configs = [openmldefaults.utils.selected_row_to_config_dict(config_frame[scoring], idx, config_space) for idx in range(len(config_frame[scoring]))]
+                scores = get_scores_live(task_id, configs, search_space_identifier, scoring)
+                with open(result_filepath_live, 'wb') as fp:
+                    pickle.dump(scores, fp, protocol=0)
+                logging.info('live results generated, saved to: %s' % result_filepath_live)
+            else:
+                logging.info('live results already exists, see: %s' % result_filepath_live)
 
 
 def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str],
@@ -190,26 +231,7 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                 logging.info('surrogated results already exists, see: %s' % result_filepath_surrogated)
         else:  # run on live
             if not os.path.exists(result_filepath_live):
-                task = openml.tasks.get_task(task_id)
-                X, y = task.get_X_and_y()
-                dataset = task.get_dataset()
-                nominal_indices = dataset.get_features_by_type('nominal', [task.target_name])
-                numeric_indices = dataset.get_features_by_type('numeric', [task.target_name])
-
-                res = openmldefaults.search.convert_defaults_to_multiple_param_grids(result_defaults['defaults'],
-                                                                                     'classifier',
-                                                                                     search_space_identifier,
-                                                                                     numeric_indices=numeric_indices,
-                                                                                     nominal_indices=nominal_indices)
-                classifiers, param_grids = res
-                sklearn_measure, sklearn_maximize = openmldefaults.utils.openml_measure_to_sklearn(scoring)
-                search_clf = openmldefaults.search.EstimatorSelectionHelper(classifiers, param_grids,
-                                                                            cv=3, n_jobs=1, verbose=True,
-                                                                            scoring=sklearn_measure,
-                                                                            maximize=sklearn_maximize)
-                scores = sklearn.model_selection.cross_val_score(search_clf, X, y,
-                                                                 scoring=sklearn_measure,
-                                                                 cv=10, verbose=1)
+                scores = get_scores_live(task_id, result_defaults['defaults'], search_space_identifier, scoring)
                 with open(result_filepath_live, 'wb') as fp:
                     pickle.dump(scores, fp, protocol=0)
                 logging.info('live results generated, saved to: %s' % result_filepath_live)
