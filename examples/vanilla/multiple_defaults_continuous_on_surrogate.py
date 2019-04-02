@@ -9,8 +9,12 @@ import os
 import pandas as pd
 
 
+# SSHFS NEMO FREIBURG:
 # sshfs jv2657@habanero.rcs.columbia.edu:/rigel/home/jv2657/experiments ~/habanero_experiments
-# sshfs jv2657@habanero.rcs.columbia.edu:/rigel/dsi/users/jv2657/experiments ~/habanero_experiments
+#
+# SSHFS GRACE LEIDEN:
+# ssh -f -N -L 1233:grace.liacs.nl:22 rijnjnvan@gold.liacs.nl
+# sshfs -p 1233 vanrijn@localhost:/home/vanrijn/experiments ~/grace_experiments
 def parse_args():
     metadata_file_svc = os.path.expanduser('~/data/openml-defaults/svc.arff')
     metadata_file_gb = os.path.expanduser('~/data/openml-defaults/gradient_boosting.arff')
@@ -31,7 +35,6 @@ def parse_args():
     parser.add_argument('--normalize_a3r', type=str, default='StandardScaler')
     parser.add_argument('--a3r_r', type=int, default=1)
     parser.add_argument('--aggregate', type=str, choices=openmldefaults.experiments.AGGREGATES, default='sum')
-    parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--minimum_evals', type=int, default=128)
