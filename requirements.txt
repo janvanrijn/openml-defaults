@@ -5,9 +5,12 @@ joblib
 liac-arff
 matplotlib
 numpy
-pandas==0.24.0dev
+openml
+git+https://github.com/openml/openml-python-contrib.git
+pandas
 pulp
 scikit-learn
+git+https://github.com/openml/sklearn-bot.git
 scipy
 scikit-optimize
 seaborn

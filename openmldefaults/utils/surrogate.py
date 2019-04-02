@@ -104,7 +104,7 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
         return result
 
 
-def train_surrogate_on_task(task_id: int,
+def train_surrogate_on_task(task_id: typing.Union[int, str],
                             config_space: ConfigSpace.ConfigurationSpace,
                             setup_data: pd.DataFrame,
                             evaluation_measure: str,
@@ -152,7 +152,7 @@ def train_surrogate_on_task(task_id: int,
 
     y = setup_data[evaluation_measure].values
     del setup_data[evaluation_measure]
-    logging.info('Dimensions of meta-data task %d: %s. Target %s [%f-%f]' % (task_id,
+    logging.info('Dimensions of meta-data task %s: %s. Target %s [%f-%f]' % (task_id,
                                                                              str(setup_data.shape),
                                                                              evaluation_measure,
                                                                              min(y), max(y)))
@@ -185,7 +185,7 @@ def train_surrogate_on_task(task_id: int,
 def generate_dataset_using_surrogates(
         surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
         surrogate_columns: np.array,
-        task_ids: typing.List[int],
+        task_ids: typing.List[typing.Union[int, str]],
         config_space: ConfigSpace.ConfigurationSpace,
         configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
         scaler_type: typing.Optional[str],
@@ -252,10 +252,10 @@ def generate_dataset_using_surrogates(
     for task_id in task_ids:
         surrogate_values = surrogates[task_id].predict(df_orig.values)
         if scaler_type is not None:
-            logging.info('scaling predictions for task %d using %s' % (task_id, scaler_type))
+            logging.info('scaling predictions for task %s using %s' % (task_id, scaler_type))
             scaler = openmldefaults.utils.get_scaler(scaler_type)
             surrogate_values = scaler.fit_transform(surrogate_values.reshape(-1, 1))[:, 0]
-        column_name = 'task_%d' % task_id
+        column_name = 'task_%s' % task_id
         if column_prefix:
             column_name = '%s_%s' % (column_prefix, column_name)
         df_surrogate[column_name] = surrogate_values
@@ -274,7 +274,8 @@ def generate_surrogates_using_metadata(
         scoring: str,
         minimum_evals: int,
         n_estimators: int,
-        random_seed: int) -> typing.Tuple[typing.Dict[int, sklearn.pipeline.Pipeline], np.array]:
+        random_seed: int,
+        task_id_column: str) -> typing.Tuple[typing.Dict[int, sklearn.pipeline.Pipeline], np.array]:
     """
     Generates a data frame where each row represents a configuration, each
     column represents an openml task and each cell represents the scoring of
@@ -295,6 +296,8 @@ def generate_surrogates_using_metadata(
         The number of trees in the random forest surrogates
     random_seed: int
         A random seed, used for the surrogate model
+    task_id_column: str
+        The column name in metadata_frame that represents the dataset name or task id
 
     Returns
     -------
@@ -305,17 +308,17 @@ def generate_surrogates_using_metadata(
         surrogates)
     """
     surrogates = dict()
-    task_ids = metadata_frame['task_id'].unique()
+    task_ids = metadata_frame[task_id_column].unique()
     columns_original = None
     if len(task_ids) == 0:
         raise ValueError()
 
     for task_id in task_ids:
-        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
+        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame[task_id_column] == task_id])
         if len(setup_frame) < minimum_evals:
-            raise ValueError('Not enough evaluations in meta-frame for task %d: %d' % (task_id, minimum_evals))
+            raise ValueError('Not enough evaluations in meta-frame for task %s: %d' % (task_id, minimum_evals))
 
-        del setup_frame['task_id']
+        del setup_frame[task_id_column]
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
                                                                           config_space,
                                                                           setup_frame,
@@ -336,7 +339,8 @@ def generate_surrogates_using_metadata(
 
 def metadata_files_to_frame(metadata_files: typing.List[str],
                             search_space_identifier: str,
-                            scoring: typing.List[str]) -> pd.DataFrame:
+                            scoring: typing.List[str],
+                            task_id_column: str) -> pd.DataFrame:
     """
     Loads a meta-data set, as outputted by sklearn bot, and removes redundant
     columns and rows
@@ -362,7 +366,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
                                                                            max(metadata_frame_classif[measure])))
 
             # TODO: modularize. Remove unnecessary columns
-            legal_column_names = config_space.get_hyperparameter_names() + scoring + ['classifier', 'task_id']
+            legal_column_names = config_space.get_hyperparameter_names() + scoring + ['classifier', task_id_column]
             for column_name in metadata_frame_classif.columns.values:
                 if column_name not in legal_column_names:
                     logging.info('Removing column: %s' % column_name)
@@ -373,7 +377,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
             for row_idx, row in metadata_frame_classif.iterrows():
                 # conditionals can be nan. filter these out with notnull()
                 config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
-                del config['task_id']
+                del config[task_id_column]
                 del config['classifier']
                 for measure in scoring:
                     del config[measure]
@@ -416,7 +420,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
 
 def store_surrogate_based_results(scoring_frame: pd.DataFrame,
                                   timing_frame: typing.Optional[pd.DataFrame],
-                                  task_id: int,
+                                  task_id: typing.Union[int, str],
                                   indice_order: typing.List[int],
                                   scoring: str,
                                   usercpu_time: str,
@@ -425,10 +429,10 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
     """
     Stores the results of the surrogated based experiment to a result file.
     """
-    if not 'task_%d' % task_id in scoring_frame.columns.values:
+    if not 'task_%s' % task_id in scoring_frame.columns.values:
         raise ValueError()
     if timing_frame is not None:
-        if not 'task_%d' % task_id in timing_frame.columns.values:
+        if not 'task_%s' % task_id in timing_frame.columns.values:
             raise ValueError()
         if not scoring_frame.index.equals(timing_frame.index):
             raise ValueError()
@@ -443,10 +447,10 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
         writer.writeheader()
         writer.writerow({scoring: best_score, usercpu_time: total_time, 'iteration': 0})
         for idx in indice_order:
-            current_score = scoring_frame.iloc[idx]['task_%d' % task_id]
+            current_score = scoring_frame.iloc[idx]['task_%s' % task_id]
             current_time = np.nan
             if timing_frame is not None:
-                current_time = timing_frame.iloc[idx]['task_%d' % task_id]
+                current_time = timing_frame.iloc[idx]['task_%s' % task_id]
             # Note that this is not the same as `minimize'. E.g., when generating sets of defaults while minimizing
             # runtime, we still want to select the best default based on the criterion of the original measure
             if minimize_measure:

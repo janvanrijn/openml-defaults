@@ -1,4 +1,5 @@
 from . import gradient_boosting
+from . import resnet
 from . import svc
 
 import ConfigSpace

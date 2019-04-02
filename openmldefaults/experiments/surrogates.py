@@ -49,7 +49,8 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                  surrogate_minimum_evals: int,
                                  consider_runtime: bool,
                                  run_on_surrogate: bool,
-                                 output_directory: str):
+                                 output_directory: str,
+                                 task_id_column: str):
     np.random.seed(random_seed)
     logging.info('Starting Random Search Experiment')
     usercpu_time = 'usercpu_time_millis'
@@ -64,8 +65,8 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_defaults)]
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures)
-    task_ids = list(metadata_frame['task_id'].unique())
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures, task_id_column)
+    task_ids = list(metadata_frame[task_id_column].unique())
 
     config_frame = dict()
     for measure in measures:
@@ -75,13 +76,14 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                                                                       measure,
                                                                                       surrogate_minimum_evals,
                                                                                       surrogate_n_estimators,
-                                                                                      random_seed)
+                                                                                      random_seed,
+                                                                                      task_id_column)
         config_frame[measure] = openmldefaults.utils.generate_dataset_using_surrogates(
             surrogates, columns, task_ids, config_space, configurations, None, None, -1)
 
     for task_id in task_ids:
         result_directory = os.path.join(output_directory, classifier_identifier,
-                                        str(int(task_id)), strategy_name,
+                                        str(task_id), strategy_name,
                                         str(n_defaults), str(random_seed))
         result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize_measure))
         result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize_measure))
@@ -122,14 +124,15 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                    consider_a3r: bool,
                                    task_limit: int,
                                    run_on_surrogate: bool,
-                                   output_directory: str):
+                                   output_directory: str,
+                                   task_id_column: str):
     np.random.seed(random_seed)
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
     if consider_a3r and not consider_runtime:
         raise ValueError('Can only consider a3r when runtime is also considered.')
     
-    logging.info('Starting Default Search Experiment on Task %d' % task_id)
+    logging.info('Starting Default Search Experiment on Task %s' % task_id)
     model = openmldefaults.models.GreedyDefaults()
     usercpu_time = 'usercpu_time_millis'
     a3r = 'a3r'
@@ -143,11 +146,11 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                                   random_seed,
                                                                   search_space_identifier)
     configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_configurations)]
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures)
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures, task_id_column)
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
-    tasks_tr = list(metadata_frame['task_id'].unique())
+    tasks_tr = list(metadata_frame[task_id_column].unique())
     # remove train task from list
     tasks_tr.remove(task_id)
     if task_limit:
@@ -166,7 +169,8 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
                                                                                       measure,
                                                                                       surrogate_minimum_evals,
                                                                                       surrogate_n_estimators,
-                                                                                      random_seed)
+                                                                                      random_seed,
+                                                                                      task_id_column)
         frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
             surrogates, columns, tasks_tr, config_space, configurations, normalize, None, None)
         config_frame_tr[measure] = frame_tr
@@ -174,10 +178,10 @@ def run_vanilla_surrogates_on_task(task_id: int, metadata_files: typing.List[str
         frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
             surrogates, columns, tasks_te, config_space, configurations, None, None, None)
         config_frame_te[measure] = frame_te
-        logging.info('Ranges test task %d for measure %s [%f-%f]:' % (task_id,
+        logging.info('Ranges test task %s for measure %s [%f-%f]:' % (task_id,
                                                                       measure,
-                                                                      min(frame_te['task_%d' % task_id]),
-                                                                      max(frame_te['task_%d' % task_id])))
+                                                                      min(frame_te['task_%s' % task_id]),
+                                                                      max(frame_te['task_%s' % task_id])))
     if consider_a3r:
         # adds A3R frame
         config_frame_tr[a3r] = openmldefaults.utils.create_a3r_frame(config_frame_tr[scoring],

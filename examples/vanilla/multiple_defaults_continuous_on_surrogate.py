@@ -1,6 +1,9 @@
+import arff
 import argparse
 import logging
+import numpy as np
 import openml
+import openmlcontrib
 import openmldefaults
 import os
 import pandas as pd
@@ -14,10 +17,10 @@ def parse_args():
     metadata_file_adaboost019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/adaboost.arff')
     metadata_file_random_forest019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/random_forest.arff')
     metadata_file_svc019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/svc.arff')
+    metadata_file_resnet = os.path.expanduser('~/projects/hypeCNN/data/12param/resnet.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults_vs_rs/')
-    parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_adaboost019, metadata_file_random_forest019, metadata_file_svc019])
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -35,6 +38,7 @@ def parse_args():
     parser.add_argument('--random_iterations', type=int, default=1)
     parser.add_argument('--run_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
+    parser.add_argument('--task_id_column', default='dataset', type=str)
     args_ = parser.parse_args()
     return args_
 
@@ -43,11 +47,19 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    study = openml.study.get_study(args.study_id, 'tasks')
+    task_ids = None
+    for arff_file in args.metadata_files:
+        with open(arff_file, 'r') as fp:
+            df = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
+            if task_ids is None:
+                task_ids = np.sort(np.unique(df[args.task_id_column].values))
+            else:
+                task_ids = np.sort(np.unique(np.append(task_ids, df[args.task_id_column].values)))
+    logging.info('Task ids: %s' % task_ids)
     if args.task_idx is None:
-        all_task_ids = study.tasks
+        task_ids_to_process = task_ids
     else:
-        all_task_ids = [study.tasks[args.task_idx]]
+        task_ids_to_process = [task_ids[args.task_idx]]
 
     # run random search
     for random_seed in range(args.random_iterations):
@@ -62,10 +74,11 @@ def run(args):
             surrogate_minimum_evals=args.minimum_evals,
             consider_runtime=False,
             run_on_surrogate=args.run_on_surrogates,
-            output_directory=args.output_directory
+            output_directory=args.output_directory,
+            task_id_column=args.task_id_column
         )
 
-        for task_id in all_task_ids:
+        for task_id in task_ids_to_process:
             openmldefaults.experiments.run_vanilla_surrogates_on_task(
                 task_id=task_id,
                 random_seed=random_seed,
@@ -85,7 +98,8 @@ def run(args):
                 consider_a3r=False,
                 run_on_surrogate=args.run_on_surrogates,
                 task_limit=args.task_limit,
-                output_directory=args.output_directory)
+                output_directory=args.output_directory,
+                task_id_column=args.task_id_column)
 
 
 if __name__ == '__main__':
