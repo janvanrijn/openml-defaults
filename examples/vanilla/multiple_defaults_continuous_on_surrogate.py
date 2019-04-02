@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--random_iterations', type=int, default=1)
     parser.add_argument('--run_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
-    parser.add_argument('--task_id_column', default='dataset', type=str)
+    parser.add_argument('--task_id_column', default='task_id', type=str)
     args_ = parser.parse_args()
     return args_
 

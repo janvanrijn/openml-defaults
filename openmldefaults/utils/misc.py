@@ -35,11 +35,12 @@ def _traverse_run_folders(folder: str, n_defaults: int, traversed_directories: t
         depth = len(traversed_directories)
         results = []
         for item in folder_content:
+            subfolder = os.path.join(folder, item)
             if constraints is not None and depth in constraints:
                 if item not in constraints[depth]:
                     # skip this folder
+                    logging.info('skipping folder %s' % subfolder)
                     continue
-            subfolder = os.path.join(folder, item)
             if os.path.isdir(subfolder):
                 results += _traverse_run_folders(subfolder, n_defaults, traversed_directories + [item], constraints, log)
         return results
