@@ -1,8 +1,8 @@
 import arff
 import argparse
+import json
 import logging
 import numpy as np
-import openml
 import openmlcontrib
 import openmldefaults
 import os
@@ -42,6 +42,7 @@ def parse_args():
     parser.add_argument('--run_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     parser.add_argument('--task_id_column', default='task_id', type=str)
+    parser.add_argument('--override_parameters', type=str)
     args_ = parser.parse_args()
     return args_
 
@@ -78,7 +79,8 @@ def run(args):
             consider_runtime=False,
             run_on_surrogate=args.run_on_surrogates,
             output_directory=args.output_directory,
-            task_id_column=args.task_id_column
+            task_id_column=args.task_id_column,
+            override_parameters=json.loads(args.override_parameters)
         )
 
         for task_id in task_ids_to_process:
@@ -102,7 +104,9 @@ def run(args):
                 run_on_surrogate=args.run_on_surrogates,
                 task_limit=args.task_limit,
                 output_directory=args.output_directory,
-                task_id_column=args.task_id_column)
+                task_id_column=args.task_id_column,
+                override_parameters=json.loads(args.override_parameters)
+            )
 
 
 if __name__ == '__main__':

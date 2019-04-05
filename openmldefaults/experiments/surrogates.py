@@ -42,6 +42,19 @@ def get_scores_live(task_id: int, defaults: typing.List[typing.Dict], search_spa
     return scores
 
 
+def override_parameter_in_conf(configuration: typing.Dict, override_parameter: typing.Dict):
+    """
+    Given a configuration dict (mapping from hyperparameter name to value), it will override the values using an
+    override dict (mapping from hyperparameter name to new value)
+    """
+    for key, new_value in override_parameter.items():
+        if key not in configuration:
+            raise ValueError()
+        else:
+            configuration[key] = new_value
+    return configuration
+
+
 def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: int,
                                  search_space_identifier: str, scoring: str,
                                  minimize_measure: bool, n_defaults: int,
@@ -50,7 +63,8 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                  consider_runtime: bool,
                                  run_on_surrogate: bool,
                                  output_directory: str,
-                                 task_id_column: str):
+                                 task_id_column: str,
+                                 override_parameters: typing.Dict[str, typing.Any]):
     np.random.seed(random_seed)
     logging.info('Starting Random Search Experiment')
     usercpu_time = 'usercpu_time_millis'
@@ -64,7 +78,9 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
-    configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_defaults)]
+    configurations = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
+                      for c in config_space.sample_configuration(n_defaults)]
+    logging.info(configurations)
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures, task_id_column)
     task_ids = list(metadata_frame[task_id_column].unique())
 
@@ -85,9 +101,8 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
         result_directory = os.path.join(output_directory, classifier_identifier,
                                         str(task_id), strategy_name,
                                         str(n_defaults), str(random_seed))
-        result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize_measure))
-        result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize_measure))
         if run_on_surrogate:
+            result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize_measure))
             if not os.path.exists(result_filepath_surrogated):
                 openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
                                                                    config_frame[usercpu_time] if consider_runtime else None,
@@ -101,7 +116,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
             else:
                 logging.info('surrogated random search results already exists, see: %s' % result_filepath_surrogated)
         else:
-            print(config_frame[scoring].index.tolist())
+            result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize_measure))
             if not os.path.exists(result_filepath_live):
                 configs = [openmldefaults.utils.selected_row_to_config_dict(config_frame[scoring], idx, config_space) for idx in range(len(config_frame[scoring]))]
                 scores = get_scores_live(task_id, configs, search_space_identifier, scoring)
@@ -126,7 +141,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    task_limit: int,
                                    run_on_surrogate: bool,
                                    output_directory: str,
-                                   task_id_column: str):
+                                   task_id_column: str,
+                                   override_parameters: typing.Dict[str, typing.Any]):
     np.random.seed(random_seed)
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
@@ -146,7 +162,9 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
-    configurations = [c.get_dictionary() for c in config_space.sample_configuration(n_configurations)]
+    configurations = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
+                      for c in config_space.sample_configuration(n_defaults)]
+    logging.info(configurations)
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures, task_id_column)
 
     # this ensures that we only take tasks on which a surrogate was trained
