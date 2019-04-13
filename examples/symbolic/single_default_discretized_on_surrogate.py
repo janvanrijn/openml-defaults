@@ -216,7 +216,7 @@ def run(args):
             config_space,
             setup_frame,
             args.scoring,
-            normalize=True,  # TODO: check whether neccessary
+            normalize=True,  # TODO: check whether necessary
             n_estimators=args.n_estimators,
             random_seed=args.random_seed)
         if not np.array_equal(config_frame_orig.columns.values, columns):

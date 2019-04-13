@@ -80,7 +80,7 @@ def run(args):
             run_on_surrogate=args.run_on_surrogates,
             output_directory=args.output_directory,
             task_id_column=args.task_id_column,
-            override_parameters=json.loads(args.override_parameters)
+            override_parameters=json.loads(args.override_parameters) if args.override_parameters else None
         )
 
         for task_id in task_ids_to_process:
@@ -105,7 +105,7 @@ def run(args):
                 task_limit=args.task_limit,
                 output_directory=args.output_directory,
                 task_id_column=args.task_id_column,
-                override_parameters=json.loads(args.override_parameters)
+                override_parameters=json.loads(args.override_parameters) if args.override_parameters else None
             )
 
 

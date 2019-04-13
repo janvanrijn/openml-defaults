@@ -42,11 +42,13 @@ def get_scores_live(task_id: int, defaults: typing.List[typing.Dict], search_spa
     return scores
 
 
-def override_parameter_in_conf(configuration: typing.Dict, override_parameter: typing.Dict):
+def override_parameter_in_conf(configuration: typing.Dict, override_parameter: typing.Optional[typing.Dict]):
     """
     Given a configuration dict (mapping from hyperparameter name to value), it will override the values using an
     override dict (mapping from hyperparameter name to new value)
     """
+    if override_parameter is None:
+        return configuration
     for key, new_value in override_parameter.items():
         if key not in configuration:
             raise ValueError()
