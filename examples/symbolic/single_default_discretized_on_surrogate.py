@@ -181,7 +181,7 @@ def run(args):
     if 34536 in study.tasks:
         study.tasks.remove(34536)
 
-    config_space = openmldefaults.config_spaces.get_config_space(args.classifier_name, args.random_seed, args.search_space_identifier)
+    config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name], args.random_seed, args.search_space_identifier)
     configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
 
     config_frame_orig = pd.DataFrame(configurations)
