@@ -195,6 +195,7 @@ def run(args):
 
     with open(args.metadata_qualities_file, 'r') as fp:
         quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
+        quality_frame = quality_frame.set_index(['task_id'])
 
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_performance_file)
     if args.scoring not in metadata_atts['col_measures']:
