@@ -1,3 +1,4 @@
+import arff
 import argparse
 import ConfigSpace
 import logging
@@ -13,13 +14,15 @@ import typing
 
 
 def parse_args():
-    metadata_file = '/home/janvanrijn/projects/sklearn-bot/data/svc.arff'
+    metadata_svc = os.path.expanduser('~/projects/sklearn-bot/data/svc.arff')
+    metadata_qualities = os.path.expanduser('~/projects/openml-python-contrib/data/metafeatures_openml100.arff')
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
     parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=None)
-    parser.add_argument('--metadata_file', type=str, default=metadata_file)
+    parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
+    parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -186,12 +189,14 @@ def run(args):
 
     config_frame_orig = pd.DataFrame(configurations)
     config_frame_orig.sort_index(axis=1, inplace=True)
-    quality_frame = openmlcontrib.meta.get_tasks_qualities_as_dataframe(study.tasks, False, -1, True)
 
-    metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_file)
+    with open(args.metadata_qualities_file, 'r') as fp:
+        quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
+
+    metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_performance_file)
     if args.scoring not in metadata_atts['col_measures']:
         raise ValueError('Could not find measure: %s' % args.scoring)
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame([args.metadata_file],
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame([args.metadata_performance_file],
                                                                   args.search_space_identifier,
                                                                   [args.scoring],
                                                                   task_id_column=args.task_id_column)
