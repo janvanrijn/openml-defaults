@@ -43,3 +43,35 @@ def get_hyperparameter_search_space_small(seed):
     cs.add_condition(coef0_condition)
 
     return cs
+
+
+def get_hyperparameter_search_space_micro(seed):
+    """
+    Small version of svm config space, featuring important hyperparameters
+    as used by:
+    http://metalearning.ml/2018/papers/metalearn2018_paper70.pdf
+
+    Parameters
+    ----------
+    seed: int
+        Random seed that will be used to sample random configurations
+
+    Returns
+    -------
+    cs: ConfigSpace.ConfigurationSpace
+        The configuration space object
+    """
+    cs = ConfigSpace.ConfigurationSpace('sklearn.svm.SVC', seed)
+
+    kernel = ConfigSpace.Constant(name='svc__kernel', value='rbf')
+    C = ConfigSpace.UniformFloatHyperparameter(name='svc__C', lower=0.03125, upper=32768, log=True, default_value=1.0)
+    gamma = ConfigSpace.UniformFloatHyperparameter(
+        name='svc__gamma', lower=3.0517578125e-05, upper=8, log=True, default_value=0.1)
+
+    cs.add_hyperparameters([
+        kernel,
+        C,
+        gamma
+    ])
+
+    return cs
