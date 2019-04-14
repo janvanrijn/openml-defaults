@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
-    parser.add_argument('--qualities', type=str, nargs='+', default=['NumberOfFeatures'])
+    parser.add_argument('--qualities', type=str, nargs='+')
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
