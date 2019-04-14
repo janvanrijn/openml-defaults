@@ -23,6 +23,7 @@ def parse_args():
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
     parser.add_argument('--search_qualities', type=str, nargs='+')
     parser.add_argument('--search_hyperparameters', type=str, nargs='+')
+    parser.add_argument('--search_transform_fns', type=str, nargs='+')
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -42,6 +43,7 @@ def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
                                            symbolic_alpha_value: typing.Optional[float],
                                            symbolic_mf_values: typing.Optional[typing.Dict[int, float]]) \
         -> typing.Tuple[typing.Dict, np.array]:
+    # TODO: normalize predictions
     num_configs = config_frame.shape[0]
     num_tasks = len(surrogates)
     results = np.zeros((num_tasks, num_configs), dtype=np.float)
@@ -67,6 +69,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                  quality_frame: pd.DataFrame,
                  config_space: ConfigSpace.ConfigurationSpace,
                  search_hyperparameters: typing.List[str],
+                 search_transform_fns: typing.List[str],
                  hold_out_task: typing.Optional[int],
                  resized_grid_size: int,
                  output_file: str):
@@ -117,7 +120,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0,
                                                                            resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
-        for idx_trnfm_fn, (transform_name, transform_fn) in enumerate(transform_fns.items()):
+        for idx_trnfm_fn, transform_name in enumerate(search_transform_fns):
             logging.info('- Transformer fn %s (%d/%d)' % (transform_name, idx_trnfm_fn + 1, len(transform_fns)))
             geom_space = np.geomspace(0.01, 2, 10)
             geom_space = np.append(geom_space, [1])
@@ -125,6 +128,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                 logging.info('--- Alpha value %f (%d/%d)' % (alpha_value, idx_av + 1, len(geom_space)))
                 for meta_feature in quality_frame.columns.values:
                     try:
+                        transform_fn = openmldefaults.symbolic.all_transform_fns()[transform_name]
                         symbolic_config, symbolic_results_per_task = select_best_configuration_across_tasks(
                             config_frame_prime,
                             surrogates,
@@ -239,7 +243,7 @@ def run(args):
             config_space,
             setup_frame,
             args.scoring,
-            normalize=True,  # TODO: check whether necessary
+            normalize=False,
             n_estimators=args.n_estimators,
             random_seed=args.random_seed)
         if not np.array_equal(config_frame_orig.columns.values, columns):
@@ -250,12 +254,13 @@ def run(args):
     os.makedirs(os.path.join(args.output_directory, args.classifier_name), exist_ok=True)
     output_file = os.path.join(args.output_directory, args.classifier_name, 'results_all.pkl')
     if args.task_idx is None:
-        logging.info('Evaluating on train tasks')
+        logging.info('Evaluating on train tasks (%d)' % len(all_task_ids))
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
                      quality_frame=metadata_quality_frame,
                      config_space=config_space,
                      search_hyperparameters=args.search_hyperparameters,
+                     search_transform_fns=args.search_transform_fns,
                      resized_grid_size=args.resized_grid_size,
                      hold_out_task=None,
                      output_file=output_file)
@@ -269,6 +274,7 @@ def run(args):
                      quality_frame=metadata_quality_frame,
                      config_space=config_space,
                      search_hyperparameters=args.search_hyperparameters,
+                     search_transform_fns=args.search_transform_fns,
                      resized_grid_size=args.resized_grid_size,
                      hold_out_task=task_id,
                      output_file=output_file)
