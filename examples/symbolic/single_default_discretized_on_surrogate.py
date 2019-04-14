@@ -102,17 +102,19 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
     transform_fns = openmldefaults.symbolic.all_transform_fns()
     symbolic_defaults = list()
+    search_hyperparameters = search_hyperparameters if search_hyperparameters is not None \
+        else [hp.name for hp in config_space.get_hyperparameters()]
     for idx_hp, hyperparameter_name in enumerate(search_hyperparameters):
         hyperparameter = config_space.get_hyperparameter(hyperparameter_name)
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
             logging.warning('Skipping Constant Hyperparameter: %s' % hyperparameter.name)
-            raise ValueError()
+            continue
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
             logging.warning('Skipping Unparameterized Hyperparameter: %s' % hyperparameter.name)
-            raise ValueError()
+            continue
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
             logging.warning('Skipping Non-Numerical Hyperparameter: %s' % hyperparameter.name)
-            raise ValueError()
+            continue
         logging.info('Started with hyperparameter %s (%d/%d)' % (hyperparameter.name,
                                                                  idx_hp + 1,
                                                                  len(search_hyperparameters)))
