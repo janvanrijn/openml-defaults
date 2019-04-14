@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--random_seed', type=int, default=42)
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--task_id_column', default='task_id', type=str)
+    parser.add_argument('--skip_row_check', action='store_true')
     return parser.parse_args()
 
 
@@ -184,7 +185,9 @@ def run(args):
     if 34536 in study.tasks:
         study.tasks.remove(34536)
 
-    config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name], args.random_seed, args.search_space_identifier)
+    config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
+                                                                  args.random_seed,
+                                                                  args.search_space_identifier)
     configurations = openmldefaults.utils.generate_grid_configurations(config_space, 0, args.resized_grid_size)
 
     config_frame_orig = pd.DataFrame(configurations)
@@ -199,7 +202,8 @@ def run(args):
     metadata_frame = openmldefaults.utils.metadata_files_to_frame([args.metadata_performance_file],
                                                                   args.search_space_identifier,
                                                                   [args.scoring],
-                                                                  task_id_column=args.task_id_column)
+                                                                  task_id_column=args.task_id_column,
+                                                                  skip_row_check=args.skip_row_check)
 
     surrogates = dict()
     for idx, task_id in enumerate(study.tasks):

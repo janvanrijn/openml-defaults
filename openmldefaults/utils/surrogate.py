@@ -340,10 +340,35 @@ def generate_surrogates_using_metadata(
 def metadata_files_to_frame(metadata_files: typing.List[str],
                             search_space_identifier: str,
                             scoring: typing.List[str],
-                            task_id_column: str) -> pd.DataFrame:
+                            task_id_column: str,
+                            skip_row_check: bool) -> pd.DataFrame:
     """
     Loads a meta-data set, as outputted by sklearn bot, and removes redundant
-    columns and rows
+    columns and rows.
+
+    Parameters:
+    -----------
+    metadata_files: List[str]
+        List of files (str) to load. The base filename (without directory and extension) should match with the config
+        space to load.
+
+    search_space_identifier: str
+        The search space identifier for load config spaces
+
+    scoring: str
+        column name that contains the evaluation measure
+
+    task_id_column: str
+        column name that contains the task id
+
+    check_rows: bool
+        If set to True, all rows will be checked whether they fall within the ConfigurationSpace. If set to False, this
+        check will be skipped (saves time, but less secure)
+
+    Returns:
+    --------
+    metadata_frame_total: pd.DataFrame
+        Dataframe with columns being the task_id, hyperparameters and performance measure.
     """
     metadata_frame_total = None
     for metadata_file in metadata_files:
@@ -374,18 +399,19 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
 
             # TODO: modularize. Remove unnecessary rows
             to_drop_indices = []
-            for row_idx, row in metadata_frame_classif.iterrows():
-                # conditionals can be nan. filter these out with notnull()
-                config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
-                del config[task_id_column]
-                del config['classifier']
-                for measure in scoring:
-                    del config[measure]
-                try:
-                    ConfigSpace.Configuration(config_space, config)
-                except ValueError as e:
-                    logging.info('Dropping config, %s' % e)
-                    to_drop_indices.append(row_idx)
+            if not skip_row_check:
+                for row_idx, row in metadata_frame_classif.iterrows():
+                    # conditionals can be nan. filter these out with notnull()
+                    config = {k: v for k, v in row.items() if row.isna()[k] == False}  # JvR: must have == comparison
+                    del config[task_id_column]
+                    del config['classifier']
+                    for measure in scoring:
+                        del config[measure]
+                    try:
+                        ConfigSpace.Configuration(config_space, config)
+                    except ValueError as e:
+                        logging.info('Dropping config, %s' % e)
+                        to_drop_indices.append(row_idx)
 
             metadata_frame_classif = metadata_frame_classif.drop(to_drop_indices)
             if metadata_frame_classif.shape[0] == 0:
