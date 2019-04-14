@@ -16,7 +16,7 @@ def remove_hyperparameter(config_space: ConfigSpace.ConfigurationSpace,
         if condition.parent.name != hyperparameter_name and condition.child.name != hyperparameter_name:
             config_space_prime.add_condition(condition)
         else:
-            raise ValueError()
+            raise ValueError('Hyperparameter %s can not be removed as it is part of a condition' % hyperparameter_name)
     return config_space_prime
 
 
