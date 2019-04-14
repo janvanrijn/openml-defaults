@@ -3,7 +3,6 @@ import argparse
 import ConfigSpace
 import logging
 import numpy as np
-import openml
 import openmlcontrib
 import openmldefaults
 import os
@@ -19,10 +18,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
-    parser.add_argument('--study_id', type=str, default='OpenML100', help='the tag to obtain the tasks from')
     parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
+    parser.add_argument('--qualities', type=str, nargs='+', default=['NumberOfFeatures'])
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -180,11 +179,6 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    study = openml.study.get_study(args.study_id, 'tasks')
-    study.tasks = study.tasks
-    if 34536 in study.tasks:
-        study.tasks.remove(34536)
-
     config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
                                                                   args.random_seed,
                                                                   args.search_space_identifier)
@@ -194,23 +188,34 @@ def run(args):
     config_frame_orig.sort_index(axis=1, inplace=True)
 
     with open(args.metadata_qualities_file, 'r') as fp:
-        quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
-        quality_frame = quality_frame.set_index(['task_id'])
+        metadata_quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
+        metadata_quality_frame = metadata_quality_frame.set_index(['task_id'])
+    if args.qualities is not None:
+        metadata_quality_frame = metadata_quality_frame[args.qualities]
 
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_performance_file)
     if args.scoring not in metadata_atts['col_measures']:
         raise ValueError('Could not find measure: %s' % args.scoring)
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame([args.metadata_performance_file],
-                                                                  args.search_space_identifier,
-                                                                  [args.scoring],
-                                                                  task_id_column=args.task_id_column,
-                                                                  skip_row_check=args.skip_row_check)
+    metadata_performance_frame = openmldefaults.utils.metadata_files_to_frame([args.metadata_performance_file],
+                                                                              args.search_space_identifier,
+                                                                              [args.scoring],
+                                                                              task_id_column=args.task_id_column,
+                                                                              skip_row_check=args.skip_row_check)
+    all_task_ids = metadata_quality_frame.index.unique()
+    all_task_ids_perf = set(metadata_performance_frame[args.task_id_column].unique())
+    if all_task_ids_perf != set(all_task_ids):
+        missing_quality = all_task_ids_perf - set(all_task_ids)
+        missing_perform = set(all_task_ids) - all_task_ids_perf
+        logging.warning('Task ids performance frame and quality frame do not align. Missing performance frame: %s, '
+                        'Missing quality frame: %s' % (missing_perform, missing_quality))
+        if len(missing_perform) > 0:
+            raise ValueError('Missing values in Performance Frame, please resolve.')
 
     surrogates = dict()
-    for idx, task_id in enumerate(study.tasks):
-        logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(study.tasks)))
+    for idx, task_id in enumerate(all_task_ids):
+        logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(all_task_ids)))
 
-        setup_frame = pd.DataFrame(metadata_frame.loc[metadata_frame['task_id'] == task_id])
+        setup_frame = pd.DataFrame(metadata_performance_frame.loc[metadata_performance_frame['task_id'] == task_id])
         del setup_frame['task_id']
         logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
 
@@ -240,19 +245,19 @@ def run(args):
         logging.info('Evaluating on train tasks')
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
-                     quality_frame=quality_frame,
+                     quality_frame=metadata_quality_frame,
                      config_space=config_space,
                      resized_grid_size=args.resized_grid_size,
                      hold_out_task=None,
                      output_file=output_file)
     else:
-        task_id = study.tasks[args.task_idx]
+        task_id = all_task_ids[args.task_idx]
         logging.info('Evaluating on holdout task %d (%d/%d)' %
-                     (task_id, args.task_idx + 1, len(study.tasks)))
+                     (task_id, args.task_idx + 1, len(all_task_ids)))
         output_file = os.path.join(args.output_directory, args.classifier_name, 'results_%d.pkl' % task_id)
         run_on_tasks(config_frame_orig=config_frame_orig,
                      surrogates=surrogates,
-                     quality_frame=quality_frame,
+                     quality_frame=metadata_quality_frame,
                      config_space=config_space,
                      resized_grid_size=args.resized_grid_size,
                      hold_out_task=task_id,
