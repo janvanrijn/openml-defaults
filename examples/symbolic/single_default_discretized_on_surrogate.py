@@ -178,6 +178,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     }
     with open(output_file, 'wb') as fp:
         pickle.dump(obj=total, file=fp, protocol=0)
+    logging.info('Saved result file to: %s' % output_file)
 
 
 def run(args):
