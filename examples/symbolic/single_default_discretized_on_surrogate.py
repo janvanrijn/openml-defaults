@@ -21,7 +21,8 @@ def parse_args():
     parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
-    parser.add_argument('--qualities', type=str, nargs='+')
+    parser.add_argument('--search_qualities', type=str, nargs='+')
+    parser.add_argument('--search_hyperparameters', type=str, nargs='+')
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
     parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -65,6 +66,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                  surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
                  quality_frame: pd.DataFrame,
                  config_space: ConfigSpace.ConfigurationSpace,
+                 search_hyperparameters: typing.List[str],
                  hold_out_task: typing.Optional[int],
                  resized_grid_size: int,
                  output_file: str):
@@ -97,27 +99,30 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
     transform_fns = openmldefaults.symbolic.all_transform_fns()
     symbolic_defaults = list()
-    for hyperparameter in config_space.get_hyperparameters():
+    for idx_hp, hyperparameter_name in enumerate(search_hyperparameters):
+        hyperparameter = config_space.get_hyperparameter(hyperparameter_name)
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
-            logging.info('Skipping Constant Hyperparameter: %s' % hyperparameter.name)
-            continue
+            logging.warning('Skipping Constant Hyperparameter: %s' % hyperparameter.name)
+            raise ValueError()
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter):
-            logging.info('Skipping Unparameterized Hyperparameter: %s' % hyperparameter.name)
-            continue
+            logging.warning('Skipping Unparameterized Hyperparameter: %s' % hyperparameter.name)
+            raise ValueError()
         if not isinstance(hyperparameter, ConfigSpace.hyperparameters.NumericalHyperparameter):
-            logging.info('Skipping Non-Numerical Hyperparameter: %s' % hyperparameter.name)
-            continue
-        logging.info('Started with hyperparameter %s' % hyperparameter.name)
+            logging.warning('Skipping Non-Numerical Hyperparameter: %s' % hyperparameter.name)
+            raise ValueError()
+        logging.info('Started with hyperparameter %s (%d/%d)' % (hyperparameter.name,
+                                                                 idx_hp + 1,
+                                                                 len(search_hyperparameters)))
         config_space_prime = openmldefaults.utils.remove_hyperparameter(config_space, hyperparameter.name)
         configurations = openmldefaults.utils.generate_grid_configurations(config_space_prime, 0,
                                                                            resized_grid_size)
         config_frame_prime = pd.DataFrame(configurations)
-        for transform_name, transform_fn in transform_fns.items():
-            logging.info('- Transformer fn %s' % transform_name)
+        for idx_trnfm_fn, (transform_name, transform_fn) in enumerate(transform_fns.items()):
+            logging.info('- Transformer fn %s (%d/%d)' % (transform_name, idx_trnfm_fn + 1, len(transform_fns)))
             geom_space = np.geomspace(0.01, 2, 10)
             geom_space = np.append(geom_space, [1])
-            for alpha_value in geom_space:
-                logging.info('--- Alpha value %f' % alpha_value)
+            for idx_av, alpha_value in enumerate(geom_space):
+                logging.info('--- Alpha value %f (%d/%d)' % (alpha_value, idx_av + 1, len(geom_space)))
                 for meta_feature in quality_frame.columns.values:
                     try:
                         symbolic_config, symbolic_results_per_task = select_best_configuration_across_tasks(
@@ -190,8 +195,10 @@ def run(args):
     with open(args.metadata_qualities_file, 'r') as fp:
         metadata_quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
         metadata_quality_frame = metadata_quality_frame.set_index(['task_id'])
-    if args.qualities is not None:
-        metadata_quality_frame = metadata_quality_frame[args.qualities]
+    if args.search_qualities is not None:
+        if not isinstance(args.search_qualities, list):
+            raise ValueError()
+        metadata_quality_frame = metadata_quality_frame[args.search_qualities]
 
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_performance_file)
     if args.scoring not in metadata_atts['col_measures']:
@@ -247,6 +254,7 @@ def run(args):
                      surrogates=surrogates,
                      quality_frame=metadata_quality_frame,
                      config_space=config_space,
+                     search_hyperparameters=args.search_hyperparameters,
                      resized_grid_size=args.resized_grid_size,
                      hold_out_task=None,
                      output_file=output_file)
@@ -259,6 +267,7 @@ def run(args):
                      surrogates=surrogates,
                      quality_frame=metadata_quality_frame,
                      config_space=config_space,
+                     search_hyperparameters=args.search_hyperparameters,
                      resized_grid_size=args.resized_grid_size,
                      hold_out_task=task_id,
                      output_file=output_file)
