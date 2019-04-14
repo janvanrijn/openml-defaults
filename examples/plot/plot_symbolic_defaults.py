@@ -26,7 +26,14 @@ def run(args):
         task_id = filename_base.split('_')[-1]
         with open(filepath, 'rb') as fp:
             results = pickle.load(fp)
-        print(results)
+
+        best = None
+        for res in results['symbolic_defaults']:
+            if best is None:
+                best = res
+            elif res['avg_performance'] > best['avg_performance']:
+                best = res
+        print(best)
 
         if task_id == 'all':
             pass
