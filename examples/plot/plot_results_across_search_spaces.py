@@ -87,6 +87,7 @@ def run(args):
     # absolute plots
     sns.boxplot(x="budget", y=args.scoring, hue="search_space", data=result_total, ax=ax1)
     ax1.set_title("vanilla")
+    ax1.tick_params(labelrotation=90)
     sns.boxplot(x="budget", y=args.scoring, hue="search_space", data=result_total_normalized, ax=ax2)
     ax2.set_title("normalized (per task)")
 
