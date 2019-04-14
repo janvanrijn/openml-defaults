@@ -101,9 +101,11 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                                                              baseline_holdout))
 
     transform_fns = openmldefaults.symbolic.all_transform_fns()
-    symbolic_defaults = list()
+    search_transform_fns = search_transform_fns if search_transform_fns is not None else transform_fns.keys()
     search_hyperparameters = search_hyperparameters if search_hyperparameters is not None \
         else [hp.name for hp in config_space.get_hyperparameters()]
+    
+    symbolic_defaults = list()
     for idx_hp, hyperparameter_name in enumerate(search_hyperparameters):
         hyperparameter = config_space.get_hyperparameter(hyperparameter_name)
         if isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
