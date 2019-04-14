@@ -385,6 +385,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
             metadata_frame_classif['classifier'] = classifier_name
             logging.info('Loaded %s meta-data data frame. Dimensions: %s' % (classifier_name,
                                                                              str(metadata_frame_classif.shape)))
+            logging.info('Columns: %s' % metadata_frame_classif.columns.values)
             for measure in scoring:
                 logging.info('meta-data ranges for measure %s: [%f-%f]' % (measure,
                                                                            min(metadata_frame_classif[measure]),
@@ -441,6 +442,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
 
     logging.info('Loaded %d meta-data data frames. Dimensions: %s' % (len(metadata_files),
                                                                       str(metadata_frame_total.shape)))
+    logging.info('Final Columns: %s' % metadata_frame_classif.columns.values)
     return metadata_frame_total
 
 
