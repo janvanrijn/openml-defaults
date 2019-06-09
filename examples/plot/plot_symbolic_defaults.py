@@ -33,7 +33,6 @@ def run(args):
                 best = res
             elif res['avg_performance'] > best['avg_performance']:
                 best = res
-        print(best)
 
         if task_id == 'all':
             pass

@@ -20,7 +20,6 @@ def parse_args():
     parser.add_argument('--minimize', action='store_true')
     parser.add_argument('--resized_grid_size', type=int, default=8)
     parser.add_argument('--n_defaults', type=int, default=32)
-    parser.add_argument('--n_configurations', type=int, default=2**13)
     parser.add_argument('--random_seed', type=int, default=42)
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     parser.add_argument('--n_estimators', type=int, default=64)
@@ -74,7 +73,6 @@ def run(args):
                             scoring=args.scoring,
                             minimize_measure=args.minimize,
                             n_defaults=args.n_defaults,
-                            n_configurations=args.n_configurations,
                             aggregate=aggregate,
                             a3r_r=a3r_r,
                             normalize_base=normalize_base,

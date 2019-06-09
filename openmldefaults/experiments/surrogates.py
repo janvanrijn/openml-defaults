@@ -132,7 +132,6 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
 def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    metadata_files: typing.List[str],
                                    random_seed: int, search_space_identifier: str,
-                                   n_configurations: int,
                                    scoring: str, minimize_measure: bool,
                                    n_defaults: int, aggregate: str, a3r_r: int,
                                    normalize_base: str, normalize_a3r: str,

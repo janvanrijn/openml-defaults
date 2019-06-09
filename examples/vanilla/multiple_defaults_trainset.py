@@ -1,9 +1,5 @@
-import arff
 import argparse
 import logging
-import numpy as np
-import openml
-import openmlcontrib
 import openmldefaults
 import os
 import pandas as pd
@@ -30,7 +26,6 @@ def parse_args():
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space_identifier', type=str, default='renamed')
     parser.add_argument('--minimize', action='store_true')
-    parser.add_argument('--n_configurations', type=int, default=2**13)
     parser.add_argument('--normalize_base', type=str, default='MinMaxScaler')
     parser.add_argument('--normalize_a3r', type=str, default='StandardScaler')
     parser.add_argument('--a3r_r', type=int, default=1)
@@ -58,7 +53,6 @@ def run(args):
         scoring=args.scoring,
         minimize_measure=args.minimize,
         n_defaults=args.n_defaults,
-        n_configurations=args.n_configurations,
         aggregate=args.aggregate,
         a3r_r=args.a3r_r,
         normalize_base=args.normalize_base,
