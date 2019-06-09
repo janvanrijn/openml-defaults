@@ -66,6 +66,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                  run_on_surrogate: bool,
                                  output_directory: str,
                                  task_id_column: str,
+                                 skip_row_check: bool,
                                  override_parameters: typing.Dict[str, typing.Any]):
     np.random.seed(random_seed)
     logging.info('Starting Random Search Experiment')
@@ -83,7 +84,11 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     configurations = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
                       for c in config_space.sample_configuration(n_defaults)]
     logging.info(configurations)
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures, task_id_column)
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
+                                                                  search_space_identifier,
+                                                                  measures,
+                                                                  task_id_column,
+                                                                  skip_row_check=skip_row_check)
     task_ids = list(metadata_frame[task_id_column].unique())
 
     config_frame = dict()
@@ -131,7 +136,8 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
 
 def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    metadata_files: typing.List[str],
-                                   random_seed: int, search_space_identifier: str,
+                                   random_seed: int,
+                                   search_space_identifier: typing.Optional[str],
                                    scoring: str, minimize_measure: bool,
                                    n_defaults: int, aggregate: str, a3r_r: int,
                                    normalize_base: str, normalize_a3r: str,
@@ -139,11 +145,69 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    surrogate_minimum_evals: int,
                                    consider_runtime: bool,
                                    consider_a3r: bool,
-                                   task_limit: int,
+                                   task_limit: typing.Optional[int],
                                    run_on_surrogate: bool,
                                    output_directory: str,
                                    task_id_column: str,
+                                   skip_row_check: bool,
                                    override_parameters: typing.Dict[str, typing.Any]):
+    """
+    Flexible running script that performs experiments based on surrogated default generation on a single task.
+    Has capabilities to use active testing, combine various search spaces and incorporate A3R.
+
+    Parameters
+    ----------
+    task_id: int (Optional)
+        if this variable is set, this is considered the test task. It will be removed from the meta data, the defaults
+        will be generated on the other tasks and holdout experiment will be performed on this task. If set to None,
+        the defaults will be generated on all tasks but no experiment will be performed.
+    metadata_files: List[str]
+        list of filepaths pointing to meta-data files. They should be in extended arff format, i.e., vanilla arff with
+        as first line a comment with json content describing which columns are hyperparameters and which columns are
+        performance measures
+    random_seed: int
+        the random seed to perform the experiment with. Will be used for (i) numpy, (ii) config space and
+        (iii) surrogate
+    search_space_identifier: str (Optional)
+        determines how to obtain the config space. Leave to None to obtain default version from sklearn bot. Set to
+        specific name to obtain from this package
+    scoring: str
+        The main measure to consider. Note that this has to be a column in all dataframes loaded from metadata_files
+    minimize_measure: str
+        Whether to minimize this measure (e.g., loss should be minimized, whereas accuracy should be maximized)
+    n_defaults: int
+        The number of defaults that needs to be generated. Note that depending on the search criterion, active testing
+        can not always generate this number of defaults.
+    aggregate: str
+        Determines how to aggregate scores per train task
+    a3r_r: str
+        The r-parameter of the A3R metric (if applied)
+    normalize_base: str
+        A string to identify the normalization module to normalize the train frames with scoring and runtime results
+    normalize_a3r: str
+        A string to identify the normalization module to normalize the A3R frame (if applicable)
+    surrogate_n_estimators: int
+        The number of estimators hyperparameter of the surrogate
+    surrogate_minimum_evals: int
+        Hyperparameter identifying the minumum number of data points for a specific task required to build a surrogate
+    consider_runtime: bool
+        Whether to calculate results based on run time (bad benchmark)
+    consider_a3r: bool
+        Whether to calculate results based on A3R
+    task_limit: int (Optional)
+        If set, only this number of tasks will be considered in the train set (speed)
+    run_on_surrogate: bool
+        Whether to perform a surrogated experiment or a live experiment
+    output_directory: str
+        Where to place the results (will create a directory structure)
+    task_id_column: str
+        The name of the column in the dataframe loaded based on metadata_files where task ids are stored
+    skip_row_check: bool
+        Usually the config space library checks for every configuration whether it falls within a given config space.
+        This can be disabled (speed)
+    override_parameters: dict
+        TODO jan
+    """
     np.random.seed(random_seed)
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
         raise ValueError('Incompatible experiment parameters.')
@@ -166,7 +230,11 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     configurations = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
                       for c in config_space.sample_configuration(n_defaults)]
     logging.info(configurations)
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files, search_space_identifier, measures, task_id_column)
+    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
+                                                                  search_space_identifier,
+                                                                  measures,
+                                                                  task_id_column,
+                                                                  skip_row_check)
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
@@ -226,8 +294,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                         str(normalize_a3r))
         os.makedirs(result_directory, exist_ok=True)
         result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
-        result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize))
-        result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize))
+        exp_type = 'surrogated' if run_on_surrogate else 'live'
+        result_filepath_experiment = os.path.join(result_directory, '%s_%d_%d.csv' % (exp_type, n_defaults, minimize))
 
         if os.path.isfile(result_filepath_defaults):
             with open(result_filepath_defaults, 'rb') as fp:
@@ -240,6 +308,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                                                   AGGREGATES[aggregate],
                                                                   config_space,
                                                                   False)
+            if len(result_defaults['defaults']) == 0:
+                raise ValueError('No defaults selected')
             with open(result_filepath_defaults, 'wb') as fp:
                 pickle.dump(result_defaults, fp, protocol=0)
             logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
@@ -248,7 +318,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
             logging.warning('No test task id specified. Will not perform experiment.')
         else:
             if run_on_surrogate:
-                if not os.path.exists(result_filepath_surrogated):
+                if not os.path.exists(result_filepath_experiment):
                     openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
                                                                        config_frame_te[usercpu_time] if consider_runtime else None,
                                                                        task_id,
@@ -256,15 +326,15 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                                                        scoring,
                                                                        usercpu_time,
                                                                        minimize_measure,
-                                                                       result_filepath_surrogated)
-                    logging.info('surrogated results generated, saved to: %s' % result_filepath_surrogated)
+                                                                       result_filepath_experiment)
+                    logging.info('surrogated results generated, saved to: %s' % result_filepath_experiment)
                 else:
-                    logging.info('surrogated results already exists, see: %s' % result_filepath_surrogated)
+                    logging.info('surrogated results already exists, see: %s' % result_filepath_experiment)
             else:  # run on live
-                if not os.path.exists(result_filepath_live):
+                if not os.path.exists(result_filepath_experiment):
                     scores = get_scores_live(task_id, result_defaults['defaults'], search_space_identifier, scoring)
-                    with open(result_filepath_live, 'wb') as fp:
+                    with open(result_filepath_experiment, 'wb') as fp:
                         pickle.dump(scores, fp, protocol=0)
-                    logging.info('live results generated, saved to: %s' % result_filepath_live)
+                    logging.info('live results generated, saved to: %s' % result_filepath_experiment)
                 else:
-                    logging.info('live results already exists, see: %s' % result_filepath_live)
+                    logging.info('live results already exists, see: %s' % result_filepath_experiment)

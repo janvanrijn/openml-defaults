@@ -1,6 +1,7 @@
 from . import gradient_boosting
 from . import resnet
 from . import svc
+from . import text_classification
 
 import ConfigSpace
 import openmldefaults
