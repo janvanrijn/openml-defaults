@@ -5,8 +5,10 @@ import pandas as pd
 import time
 import typing
 
+from openmldefaults.models.defaults_generator_interface import DefaultsGenerator
 
-class GreedyDefaults(object):
+
+class GreedyDefaults(DefaultsGenerator):
 
     def __init__(self):
         self.name = 'greedy'
@@ -89,7 +91,6 @@ class GreedyDefaults(object):
         results_dict = {
             'defaults': selected_defaults,
             'indices': selected_indices,
-            'objective': best_score,
             'run_time': runtime,
         }
         return results_dict

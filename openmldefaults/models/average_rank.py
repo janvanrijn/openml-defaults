@@ -1,12 +1,15 @@
 import ConfigSpace
 import logging
+import numpy as np
 import openmldefaults
 import pandas as pd
 import time
 import typing
 
+from openmldefaults.models.defaults_generator_interface import DefaultsGenerator
 
-class AverageRankDefaults(object):
+
+class AverageRankDefaults(DefaultsGenerator):
 
     def __init__(self):
         self.name = 'average_rank'
@@ -57,13 +60,8 @@ class AverageRankDefaults(object):
             raise ValueError()
         start_time = time.time()
 
-        avg_ranks = 1 + df.shape[0] - df.rank(axis=0, method='average').sum(axis=1) / df.shape[1]
-        print(avg_ranks)
-
-        selected_configs = []
-        selected_indices = []
-        best_score = None
-
+        avg_ranks = df.rank(axis=0, method='average', ascending=(not minimize)).sum(axis=1) / df.shape[1]
+        selected_indices = np.argsort(avg_ranks.values)
 
         selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx, config_space) for idx in selected_indices]
         logging.info(selected_defaults)
@@ -72,7 +70,6 @@ class AverageRankDefaults(object):
         results_dict = {
             'defaults': selected_defaults,
             'indices': selected_indices,
-            'objective': best_score,
             'run_time': runtime,
         }
         return results_dict
