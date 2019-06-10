@@ -182,6 +182,35 @@ def train_surrogate_on_task(task_id: typing.Union[int, str],
     return surrogate, setup_data.columns.values
 
 
+def generate_dataset_using_metadata(
+        metadata_frame: pd.DataFrame,
+        task_ids: typing.List[typing.Union[int, str]],
+        config_space: ConfigSpace.ConfigurationSpace,
+        measure: str,
+        task_id_column: str,
+        scaler_type: typing.Optional[str],
+        column_prefix: typing.Optional[str]) -> pd.DataFrame:
+    """
+    Turns a dataframe with columns representing the hyperparameter values, task
+    id and evaluation measures, into a data frame where each row represents a
+    configuration, each column represents an openml task and each cell represents
+    the scoring of that configuration on that task.
+    """
+    pivoted = pd.pivot_table(data=metadata_frame,
+                             index=config_space.get_hyperparameter_names(),
+                             columns=task_id_column,
+                             values=measure)
+    if pivoted.isnull().values.any():
+        raise ValueError('meta-data not complete: pivoted frame contains nans')
+    if scaler_type is not None:
+        raise NotImplementedError()
+    pivoted = pivoted[task_ids]
+    pivoted = pivoted.add_prefix('task_')
+    if column_prefix is not None:
+        pivoted = pivoted.add_prefix(column_prefix)
+    return pivoted
+
+
 def generate_dataset_using_surrogates(
         surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
         surrogate_columns: np.array,

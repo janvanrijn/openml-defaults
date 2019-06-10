@@ -138,10 +138,11 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
 def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    metadata_files: typing.List[str],
                                    models: typing.List[DefaultsGenerator],
+                                   use_surrogates: bool,
                                    random_seed: int,
                                    search_space_identifier: typing.Optional[str],
                                    scoring: str, minimize_measure: bool,
-                                   n_defaults: int, aggregate: str, a3r_r: int,
+                                   n_defaults: typing.Optional[int], aggregate: str, a3r_r: int,
                                    normalize_base: str, normalize_a3r: str,
                                    surrogate_n_estimators: int,
                                    surrogate_minimum_evals: int,
@@ -169,6 +170,10 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
         performance measures
     models: list[DefaultsGenerator]
         A list of models to generate the defaults
+    use_surrogates: bool
+        The way configurations are sampled. If set to False, no new configurations will be sampled and the meta-data
+        will be used. If set to True, surrogates will be trained and configurations will be sampled from the surrogated
+        space.
     random_seed: int
         the random seed to perform the experiment with. Will be used for (i) numpy, (ii) config space and
         (iii) surrogate
@@ -179,9 +184,10 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
         The main measure to consider. Note that this has to be a column in all dataframes loaded from metadata_files
     minimize_measure: str
         Whether to minimize this measure (e.g., loss should be minimized, whereas accuracy should be maximized)
-    n_defaults: int
+    n_defaults: int (optional)
         The number of defaults that needs to be generated. Note that depending on the search criterion, active testing
-        can not always generate this number of defaults.
+        can not always generate this number of defaults. If set to None, the number of defaults in the meta-data is
+        used.
     aggregate: str
         Determines how to aggregate scores per train task
     a3r_r: str
@@ -230,14 +236,12 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
-    configurations = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
-                      for c in config_space.sample_configuration(n_defaults)]
-    logging.info(configurations)
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
                                                                   search_space_identifier,
                                                                   measures,
                                                                   task_id_column,
                                                                   skip_row_check)
+    logging.info(metadata_frame.columns.values)
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
@@ -254,24 +258,38 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     config_frame_tr = dict()
     config_frame_te = dict()
     measures_normalize = [(scoring, normalize_base)]
+
+    configurations_sampled = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
+                              for c in config_space.sample_configuration(n_defaults)]
+    logging.info('Sampled Configurations: %s' % configurations_sampled)
     if runtime_column:
         measures_normalize.append((runtime_column, normalize_base))
     for measure, normalize in measures_normalize:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(metadata_frame,
-                                                                                      config_space,
-                                                                                      measure,
-                                                                                      surrogate_minimum_evals,
-                                                                                      surrogate_n_estimators,
-                                                                                      random_seed,
-                                                                                      task_id_column)
-        frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, columns, tasks_tr, config_space, configurations, normalize, None, None)
+        if use_surrogates:
+            surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(metadata_frame,
+                                                                                          config_space,
+                                                                                          measure,
+                                                                                          surrogate_minimum_evals,
+                                                                                          surrogate_n_estimators,
+                                                                                          random_seed,
+                                                                                          task_id_column)
+            frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
+                surrogates, columns, tasks_tr, config_space, configurations_sampled, normalize, None, None)
+        else:
+            surrogates = None
+            columns = None
+            frame_tr = openmldefaults.utils.generate_dataset_using_metadata(
+                metadata_frame, tasks_tr, config_space, measure, task_id_column, normalize, None)
         config_frame_tr[measure] = frame_tr
         if task_id:
             # NEVER! Normalize the test frame
-            frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
-                surrogates, columns, tasks_te, config_space, configurations, None, None, None)
+            if use_surrogates:
+                frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
+                    surrogates, columns, tasks_te, config_space, configurations_sampled, None, None, None)
+            else:
+                frame_te = openmldefaults.utils.generate_dataset_using_metadata(
+                    metadata_frame, tasks_te, config_space, measure, task_id_column, None, None)
             config_frame_te[measure] = frame_te
             logging.info('Ranges test task %s for measure %s [%f-%f]:' % (task_id,
                                                                           measure,
