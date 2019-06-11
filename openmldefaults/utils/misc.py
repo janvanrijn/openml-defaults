@@ -89,7 +89,8 @@ def results_from_folder_to_df(folder: str, n_defaults_in_file: int, budget: int,
     for dirs in list_dirs_runs:
         current_vanilla = {'folder_depth_%d' % idx: folder for idx, folder in enumerate(dirs[:-1])}
         current_path = '/'.join(dirs)
-        with open(os.path.join(folder, current_path), 'r') as fp:
+        csv_file = os.path.join(folder, current_path)
+        with open(csv_file, 'r') as fp:
             reader = csv.DictReader(fp)
             curve = list()
             for idx, row in enumerate(reader):
