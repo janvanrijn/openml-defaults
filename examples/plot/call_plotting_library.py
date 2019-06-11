@@ -59,11 +59,11 @@ def run(args):
     for strategy, files in strategy_files.items():
         command_perf += strategy + ' ' + ' '.join(files) + ' '
 
-    parameters_ranks = '--save %s/ranks.%s --logx --logy --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
+    parameters_ranks = '--save %s/ranks.%s --logx --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
     subprocess.call('%s %s %s %s' % (args.python_venv, script_ranks, ' '.join(df['command_ranks'].values), parameters_ranks),
                     shell=True)
 
-    parameters_acc = '--save %s/accuracy.%s --logx --logy --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
+    parameters_acc = '--save %s/accuracy.%s --logx --logy --ymin 0.001 --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
     subprocess.call('%s %s %s %s' % (args.python_venv, script_perf, command_perf, parameters_acc), shell=True)
 
 
