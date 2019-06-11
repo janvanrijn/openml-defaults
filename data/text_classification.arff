@@ -1,5 +1,5 @@
-% text_classification
-@RELATION {'col_measures': ['predictive_accuracy', 'runtime', 'predictive_accuracy_loss'], 'col_parameters': ['algorithm', 'representation', 'stopword_remover', 'stemmer', 'sparsity', 'feature_selection']}
+% {"col_measures": ["predictive_accuracy", "runtime", "predictive_accuracy_loss"], "col_parameters": ["algorithm", "representation", "stopword_remover", "stemmer", "sparsity", "feature_selection"]}
+@RELATION text_classification
 
 @ATTRIBUTE algorithm {knn, ranger, JRip, svmLinear2, J48, nnet, lda, C5.0Tree}
 @ATTRIBUTE representation {Td-idf, freq}
