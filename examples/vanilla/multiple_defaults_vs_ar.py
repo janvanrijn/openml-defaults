@@ -16,15 +16,15 @@ import pandas as pd
 # ssh -f -N -L 1233:grace.liacs.nl:22 rijnjnvan@gold.liacs.nl
 # sshfs -p 1233 vanrijn@localhost:/home/vanrijn/experiments ~/grace_experiments
 def parse_args():
-    metadata_file_text_classification = os.path.expanduser('~/data/text_classification.arff')
+    metadata_file_text_classification = os.path.expanduser('../../data/text_classification.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
-                        default=os.path.expanduser('~/experiments/openml-defaults/active_testing/'))
+                        default=os.path.expanduser('~/experiments/openml-defaults/at_vs_ar/'))
     parser.add_argument('--task_idx', type=int)
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_text_classification])
-    parser.add_argument('--scoring', type=str, default='predictive_accuracy')
+    parser.add_argument('--scoring', type=str, default='predictive_accuracy_loss')
     parser.add_argument('--search_space_identifier', type=str, default='ferreira')
-    parser.add_argument('--minimize', action='store_true')
+    parser.add_argument('--minimize', action='store_true', default=True)
     parser.add_argument('--normalize_base', type=str, default=None)
     parser.add_argument('--normalize_a3r', type=str, default=None)
     parser.add_argument('--a3r_r', type=int, default=64)

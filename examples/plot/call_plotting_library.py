@@ -9,8 +9,8 @@ import subprocess
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
-    parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/active_testing'))
-    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/active_testing'))
+    parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/at_vs_ar'))
+    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/at_vs_ar'))
     parser.add_argument('--python_venv', type=str, default=os.path.expanduser('~/anaconda3/envs/openml-defaults/bin/python'))
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--classifier_name', type=str, default='text_classification')
@@ -59,11 +59,11 @@ def run(args):
     for strategy, files in strategy_files.items():
         command_perf += strategy + ' ' + ' '.join(files) + ' '
 
-    parameters_ranks = '--save %s/ranks.%s --logx --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
+    parameters_ranks = '--save %s/ranks.%s --logx --logy --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
     subprocess.call('%s %s %s %s' % (args.python_venv, script_ranks, ' '.join(df['command_ranks'].values), parameters_ranks),
                     shell=True)
 
-    parameters_acc = '--save %s/accuracy.%s --logx --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
+    parameters_acc = '--save %s/accuracy.%s --logx --logy --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
     subprocess.call('%s %s %s %s' % (args.python_venv, script_perf, command_perf, parameters_acc), shell=True)
 
 
