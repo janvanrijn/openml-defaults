@@ -60,8 +60,10 @@ class AverageRankDefaults(DefaultsGenerator):
             raise ValueError()
         start_time = time.time()
 
-        avg_ranks = df.rank(axis=0, method='average', ascending=(not minimize)).sum(axis=1) / df.shape[1]
-        selected_indices = np.argsort(avg_ranks.values)
+        # note that we deliberately inverse the average ranks (to work with np.argsort) The TODO rank is now the
+        # best to go with
+        inv_avg_ranks = df.rank(axis=0, method='average', ascending=minimize).sum(axis=1) / df.shape[1]
+        selected_indices = np.argsort(inv_avg_ranks.values)
 
         selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx, config_space) for idx in selected_indices]
         logging.info(selected_defaults)

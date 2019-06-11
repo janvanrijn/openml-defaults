@@ -7,9 +7,10 @@ import typing
 
 def selected_row_to_config_dict(df: pd.DataFrame, row_idx: int, config_space: ConfigSpace.ConfigurationSpace) -> typing.Dict:
     values = df.index[row_idx]
-    if len(values) > 1:
+    if isinstance(df.index, pd.core.index.MultiIndex):
         keys = df.index.names
     else:
+        values = [values]
         keys = [df.index.name]
     if not isinstance(keys, list):
         raise ValueError('data frame index not interpreted properly')
