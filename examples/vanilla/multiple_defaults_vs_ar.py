@@ -65,7 +65,7 @@ def run(args):
         for task_id in task_ids_to_process:
             openmldefaults.experiments.run_vanilla_surrogates_on_task(
                 task_id=task_id,
-                models=[openmldefaults.models.AverageRankDefaults(), openmldefaults.models.GreedyDefaults()],
+                models=[openmldefaults.models.AverageRankDefaults(), openmldefaults.models.ActiveTestingDefaults()],
                 use_surrogates=False,
                 random_seed=random_seed,
                 search_space_identifier=args.search_space_identifier,

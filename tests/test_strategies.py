@@ -23,17 +23,25 @@ class TestStrategies(unittest.TestCase):
         expected_results = {
             'average_rank': {
                 True: [0, 1, 2],
-                False: [2, 1, 0]
+                False: [2, 1, 0],
             },
             'greedy': {
                 True: [0, 2],
-                False: [2, 0]
-            }
+                False: [2, 0],
+            },
+            'active_testing': {
+                True: [0, 2, 1],
+                False: [2, 0, 1],
+            },
         }
         return df, expected_results
 
     def test_models_on_simple_dataset(self):
-        models = [openmldefaults.models.AverageRankDefaults(), openmldefaults.models.GreedyDefaults()]
+        models = [
+            openmldefaults.models.AverageRankDefaults(),
+            openmldefaults.models.GreedyDefaults(),
+            openmldefaults.models.ActiveTestingDefaults(),
+        ]
 
         df, expected_results = TestStrategies.get_simple_dataset()
 
