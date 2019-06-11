@@ -1,4 +1,5 @@
 import argparse
+import collections
 import logging
 import openmldefaults
 import os
@@ -21,7 +22,8 @@ def run(args):
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    script = os.path.expanduser('~/projects/plotting_scripts/scripts/plot_ranks_from_csv.py')
+    script_ranks = os.path.expanduser('~/projects/plotting_scripts/scripts/plot_ranks_from_csv.py')
+    script_perf = os.path.expanduser('~/projects/plotting_scripts/scripts/plot_test_performance_from_csv.py')
     folder_constraints = {
         2: ['384'],
         3: ['0'],
@@ -45,13 +47,23 @@ def run(args):
     result_files = openmldefaults.utils.misc._traverse_run_folders(results_directory,
                                                                    384, list(), folder_constraints, True)
     df = pd.DataFrame(result_files, columns=list(folder_legend.values()) + ['filename'])
+    df['total_path'] = df.apply(lambda col: '%s/%s' % (results_directory, '/'.join(col.values)), axis=1)
+    df['command_ranks'] = df.apply(lambda col: '%s %s %s' % (col['task_id'],
+                                                             col['strategy'],
+                                                             col['total_path']), axis=1)
+    strategy_files = collections.defaultdict(list)
+    for index, row in df.iterrows():
+        strategy_files[row['strategy']].append(row['total_path'])
+    command_perf = ''
+    for strategy, files in strategy_files.items():
+        command_perf += strategy + ' ' + ' '.join(files)
 
-    df['command_ranks'] = df.apply(lambda col: '%s %s %s/%s' % (col['task_id'],
-                                                                col['strategy'],
-                                                                results_directory,
-                                                                '/'.join(col.values)), axis=1)
-    parameters = '-s %s/ranks.pdf -ylabel "Avg. rank" -xlabel "Runtime (seconds)"' % args.output_directory
-    subprocess.call('%s %s %s %s' % (args.python_venv, script, ' '.join(df['command_ranks'].values), parameters), shell=True)
+    parameters_ranks = '--save %s/ranks.pdf --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % args.output_directory
+    subprocess.call('%s %s %s %s' % (args.python_venv, script_ranks, ' '.join(df['command_ranks'].values), parameters_ranks),
+                    shell=True)
+
+    parameters_acc = '--save %s/accuracy.pdf --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % args.output_directory
+    subprocess.call('%s %s %s %s' % (args.python_venv, script_perf, command_perf, parameters_acc), shell=True)
 
 
 if __name__ == '__main__':
