@@ -58,11 +58,11 @@ def run(args):
     for strategy, files in strategy_files.items():
         command_perf += strategy + ' ' + ' '.join(files) + ' '
 
-    parameters_ranks = '--save %s/ranks.pdf --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % args.output_directory
+    parameters_ranks = '--save %s/ranks.pdf --logx --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % args.output_directory
     subprocess.call('%s %s %s %s' % (args.python_venv, script_ranks, ' '.join(df['command_ranks'].values), parameters_ranks),
                     shell=True)
 
-    parameters_acc = '--save %s/accuracy.pdf --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % args.output_directory
+    parameters_acc = '--save %s/accuracy.pdf --logx --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % args.output_directory
     subprocess.call('%s %s %s %s' % (args.python_venv, script_perf, command_perf, parameters_acc), shell=True)
 
 
