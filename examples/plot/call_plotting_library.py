@@ -56,7 +56,7 @@ def run(args):
         strategy_files[row['strategy']].append(row['total_path'])
     command_perf = ''
     for strategy, files in strategy_files.items():
-        command_perf += strategy + ' ' + ' '.join(files)
+        command_perf += strategy + ' ' + ' '.join(files) + ' '
 
     parameters_ranks = '--save %s/ranks.pdf --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % args.output_directory
     subprocess.call('%s %s %s %s' % (args.python_venv, script_ranks, ' '.join(df['command_ranks'].values), parameters_ranks),
