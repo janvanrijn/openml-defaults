@@ -15,6 +15,7 @@ def parse_args():
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--classifier_name', type=str, default='text_classification')
     parser.add_argument('--n_defaults_in_file', type=int, default=384)
+    parser.add_argument('--extension', type=str, default='pdf')
     return parser.parse_args()
 
 
@@ -58,11 +59,11 @@ def run(args):
     for strategy, files in strategy_files.items():
         command_perf += strategy + ' ' + ' '.join(files) + ' '
 
-    parameters_ranks = '--save %s/ranks.pdf --logx --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % args.output_directory
+    parameters_ranks = '--save %s/ranks.%s --logx --ylabel "Avg. rank" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
     subprocess.call('%s %s %s %s' % (args.python_venv, script_ranks, ' '.join(df['command_ranks'].values), parameters_ranks),
                     shell=True)
 
-    parameters_acc = '--save %s/accuracy.pdf --logx --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % args.output_directory
+    parameters_acc = '--save %s/accuracy.%s --logx --ylabel "Accuracy" --xlabel "Runtime (seconds)"' % (args.output_directory, args.extension)
     subprocess.call('%s %s %s %s' % (args.python_venv, script_perf, command_perf, parameters_acc), shell=True)
 
 
