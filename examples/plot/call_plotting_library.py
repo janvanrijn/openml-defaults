@@ -16,6 +16,7 @@ def parse_args():
     parser.add_argument('--classifier_name', type=str, default='text_classification')
     parser.add_argument('--n_defaults_in_file', type=int, default=384)
     parser.add_argument('--extension', type=str, default='pdf')
+    parser.add_argument('--a3r_r', type=int, default=2)
     return parser.parse_args()
 
 
@@ -29,7 +30,7 @@ def run(args):
         2: ['384'],
         3: ['0'],
         4: ['sum'],
-        5: ['64'],
+        5: [args.a3r_r],
         6: ['None'],
         7: ['None']
     }
