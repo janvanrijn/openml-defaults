@@ -51,3 +51,38 @@ class TestStrategies(unittest.TestCase):
                 res = model.generate_defaults_discretized(df, 3, minimize, np.sum, self.cs, False)
                 self.assertListEqual(list(res['indices']), expected_results[model.name][minimize])
 
+    def test_average_rank_on_text_classification(self):
+        ground_truth = pd.read_csv('../data/text_classification_ar.csv')
+        del ground_truth['rank']
+        del ground_truth['workflow']
+
+        classifier_names = ['text_classification']
+        random_seed = 0
+        search_space_identifier = 'ferreira'
+        metadata_files = ['../data/text_classification.arff']
+        measures = ['predictive_accuracy', 'runtime']
+        task_id_column = 'dataset'
+        skip_row_check = True
+
+        config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
+                                                                      random_seed,
+                                                                      search_space_identifier)
+        metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
+                                                                      search_space_identifier,
+                                                                      measures,
+                                                                      task_id_column,
+                                                                      skip_row_check)
+        for hyperparameter in ground_truth.columns.values:
+            rename_dict = {hyperparameter: 'text_classification:' + hyperparameter}
+            ground_truth = ground_truth.rename(columns=rename_dict)
+        ground_truth['classifier'] = 'text_classification'
+        tasks_tr = list(metadata_frame[task_id_column].unique())
+        frame_tr = openmldefaults.utils.generate_dataset_using_metadata(
+            metadata_frame, tasks_tr, config_space, measures[0], task_id_column, None, None)
+
+        model = openmldefaults.models.AverageRankDefaults()
+
+        # accuracy defaults
+        result = model.generate_defaults_discretized(frame_tr, 384, False, sum, config_space, True)
+        for idx, row in ground_truth.iterrows():
+            self.assertDictEqual(row.to_dict(), result['defaults'][idx])

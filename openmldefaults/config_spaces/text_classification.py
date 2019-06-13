@@ -17,7 +17,7 @@ def get_hyperparameter_search_space_ferreira(seed=None):
     cs: ConfigSpace.ConfigurationSpace
         The configuration space object
     """
-    cs = ConfigSpace.ConfigurationSpace('ResNet18_classifier', seed)
+    cs = ConfigSpace.ConfigurationSpace('TextClassification_classifier', seed)
     representation = ConfigSpace.CategoricalHyperparameter(
         name='representation', choices=['Td-idf', 'freq'])
     stopword_remover = ConfigSpace.CategoricalHyperparameter(

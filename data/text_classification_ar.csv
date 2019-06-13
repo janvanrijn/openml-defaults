@@ -1,0 +1,24 @@
+rank,workflow,representation,stopword_remover,stemmer,sparsity,feature_selection,algorithm
+1,w360,freq,smart,porter,0.99,none,ranger
+2,w168,Td-idf,smart,porter,0.99,none,ranger
+3,w296,freq,default,porter,0.99,none,ranger
+4,w104,Td-idf,default,porter,0.99,none,ranger
+5,w328,freq,smart,none,0.99,none,ranger
+6,w264,freq,default,none,0.99,none,ranger
+7,w232,freq,none,porter,0.99,none,ranger
+8,w136,Td-idf,smart,none,0.99,none,ranger
+9,w40,Td-idf,none,porter,0.99,none,ranger
+10,w72,Td-idf,default,none,0.99,none,ranger
+11,w176,Td-idf,smart,porter,0.99,> 0,ranger
+12,w312,freq,default,porter,0.98,none,ranger
+13,w376,freq,smart,porter,0.98,none,ranger
+14,w112,Td-idf,default,porter,0.99,> 0,ranger
+15,w184,Td-idf,smart,porter,0.98,none,ranger
+16,w368,freq,smart,porter,0.99,> 0,ranger
+17,w304,freq,default,porter,0.99,> 0,ranger
+18,w120,Td-idf,default,porter,0.98,none,ranger
+19,w200,freq,none,none,0.99,none,ranger
+20,w48,Td-idf,none,porter,0.99,> 0,ranger
+21,w336,freq,smart,none,0.99,> 0,ranger
+22,w272,freq,default,none,0.99,> 0,ranger
+23,w174,Td-idf,smart,porter,0.99,> 0,lda
