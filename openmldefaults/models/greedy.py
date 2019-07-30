@@ -1,5 +1,6 @@
 import ConfigSpace
 import logging
+
 import openmldefaults
 import pandas as pd
 import time
@@ -12,6 +13,25 @@ class GreedyDefaults(DefaultsGenerator):
 
     def __init__(self):
         self.name = 'greedy'
+
+    @staticmethod
+    def find_best_competitor(df: pd.DataFrame,
+                             best_score: float,
+                             selected_indices: typing.List[int],
+                             aggregate: typing.Callable,
+                             minimize: bool):
+        best_addition = None
+        best_index = None
+        for idx, current_config in enumerate(df.index.values):
+            per_task_scores = openmldefaults.utils.selected_set_index(df, selected_indices + [idx], minimize)
+            current_score = aggregate(per_task_scores)
+            if best_score is None \
+                    or (minimize and current_score < best_score) \
+                    or ((not minimize) and current_score > best_score):
+                best_score = current_score
+                best_addition = current_config
+                best_index = idx
+        return best_score, best_index, best_addition
 
     def generate_defaults_discretized(self, df: pd.DataFrame, num_defaults: int,
                                       minimize: bool, aggregate: typing.Callable,
@@ -63,26 +83,19 @@ class GreedyDefaults(DefaultsGenerator):
         selected_indices = []
         best_score = None
         for itt_defaults in range(num_defaults):
-            best_addition = None
-            best_index = None
-            for idx, current_config in enumerate(df.index.values):
-                per_task_scores = openmldefaults.utils.selected_set_index(df, selected_indices + [idx], minimize)
-                current_score = aggregate(per_task_scores)
-                if best_score is None \
-                        or (minimize and current_score < best_score) \
-                        or ((not minimize) and current_score > best_score):
-                    best_score = current_score
-                    best_addition = current_config
-                    best_index = idx
+            best_score, best_index, best_addition = GreedyDefaults.find_best_competitor(df,
+                                                                                        best_score,
+                                                                                        selected_indices,
+                                                                                        aggregate,
+                                                                                        minimize)
             if best_addition is None:
                 if raise_no_improvement:
                     raise ValueError('Could not add default, as there were no '
                                      'configurations that yield improvement after '
-                                     '%d defaults' % len(selected_configs))
-                else:
-                    break
-            selected_configs.append(best_addition)
-            selected_indices.append(best_index)
+                                     '%d defaults' % len(selected_indices))
+            else:
+                selected_configs.append(best_addition)
+                selected_indices.append(best_index)
 
         selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx, config_space) for idx in selected_indices]
         logging.info(selected_defaults)
