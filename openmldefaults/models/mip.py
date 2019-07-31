@@ -2,6 +2,7 @@ import numpy as np
 import openmldefaults
 import pulp
 import time
+import typing
 
 
 class MipDefaults(object):
@@ -11,7 +12,7 @@ class MipDefaults(object):
         self.solver = solver
 
     @staticmethod
-    def get_mixed_integer_formulation(df, num_defaults):
+    def get_mixed_integer_formulation(df, num_defaults) -> typing.Tuple[typing.List, typing.Dict[str, typing.Any]]:
         num_configurations, num_tasks = df.shape
         mip_optimizer = pulp.LpProblem('ComplementaryConfigurationSelector', pulp.LpMinimize)
 
@@ -75,9 +76,7 @@ class MipDefaults(object):
         result_frame = openmldefaults.utils.selected_set(df, selected_indices)
 
         results_dict = {
-            # 'defaults': set(selected_defaults),
-            'indices': selected_indices,
             'objective': sum(result_frame),
             'run_time': runtime,
         }
-        return results_dict
+        return selected_indices, results_dict

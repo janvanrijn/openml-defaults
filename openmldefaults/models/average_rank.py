@@ -17,7 +17,8 @@ class AverageRankDefaults(DefaultsGenerator):
     def generate_defaults_discretized(self, df: pd.DataFrame, num_defaults: int,
                                       minimize: bool, aggregate: typing.Callable,
                                       config_space: ConfigSpace.ConfigurationSpace,
-                                      raise_no_improvement: bool):
+                                      raise_no_improvement: bool) \
+            -> typing.Tuple[typing.List, typing.Dict[str, typing.Any]]:
         """
         Takes a data frame with a discretized set of defaults and returns the
         average rank. The data frame should be structured as follows: each
@@ -50,9 +51,11 @@ class AverageRankDefaults(DefaultsGenerator):
 
         Returns
         -------
-        results_dict: dict
-            A dictionary containing the defaults, indices of the defaults,
-            objective score and the run time of this algorithm.
+        selected_indices: List[int]
+            List of indices, as given by the dataframe
+        results_dict: Dict[str, Any]
+            Additional meta-information. Containing at least the key 'run_time',
+            but potentially more information
         """
         logging.info('Started %s, dimensions config frame %s' % (self.name,
                                                                  str(df.shape)))
@@ -63,15 +66,12 @@ class AverageRankDefaults(DefaultsGenerator):
         # note that we deliberately inverse the average ranks (to work with np.argsort) The TODO rank is now the
         # best to go with
         inv_avg_ranks = df.rank(axis=0, method='average', ascending=minimize).sum(axis=1) / df.shape[1]
-        selected_indices = np.argsort(inv_avg_ranks.values)
+        selected_indices = list(np.argsort(inv_avg_ranks.values))
 
         selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx, config_space) for idx in selected_indices]
         logging.info(selected_defaults)
 
-        runtime = time.time() - start_time
         results_dict = {
-            'defaults': selected_defaults,
-            'indices': selected_indices,
-            'run_time': runtime,
+            'run_time': time.time() - start_time,
         }
-        return results_dict
+        return selected_indices, results_dict

@@ -320,20 +320,19 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
             result_filepath_experiment = os.path.join(result_directory, '%s_%d_%d.csv' % (exp_type, n_defaults, minimize))
 
             if os.path.isfile(result_filepath_defaults):
+                logging.info('will load defaults from: %s' % result_filepath_defaults)
                 with open(result_filepath_defaults, 'rb') as fp:
-                    result_defaults = pickle.load(fp)
-                logging.info('defaults loaded, loaded from: %s' % result_filepath_defaults)
+                    result_indices, result_defaults, meta_data = pickle.load(fp)
             else:
-                result_defaults = model.generate_defaults_discretized(config_frame_tr[measure],
-                                                                      n_defaults,
-                                                                      minimize,
-                                                                      AGGREGATES[aggregate],
-                                                                      config_space,
-                                                                      False)
-                if len(result_defaults['defaults']) == 0:
+                result_indices, meta_data = model.generate_defaults_discretized(
+                    config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], config_space, False)
+                if len(result_indices) == 0:
                     raise ValueError('No defaults selected')
+                result_defaults = [openmldefaults.utils.selected_row_to_config_dict(
+                    config_frame_tr[measure], idx, config_space) for idx in result_indices]
+
                 with open(result_filepath_defaults, 'wb') as fp:
-                    pickle.dump(result_defaults, fp, protocol=0)
+                    pickle.dump([result_indices, result_defaults, meta_data], fp, protocol=0)
                 logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
 
             if not task_id:
@@ -344,7 +343,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                         openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
                                                                            config_frame_te[runtime_column] if runtime_column else None,
                                                                            task_id,
-                                                                           result_defaults['indices'],
+                                                                           result_indices,
                                                                            scoring,
                                                                            runtime_column,
                                                                            minimize_measure,
@@ -354,7 +353,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                         logging.info('surrogated results already exists, see: %s' % result_filepath_experiment)
                 else:  # run on live
                     if not os.path.exists(result_filepath_experiment):
-                        scores = get_scores_live(task_id, result_defaults['defaults'], search_space_identifier, scoring)
+                        scores = get_scores_live(task_id, result_defaults, search_space_identifier, scoring)
                         with open(result_filepath_experiment, 'wb') as fp:
                             pickle.dump(scores, fp, protocol=0)
                         logging.info('live results generated, saved to: %s' % result_filepath_experiment)

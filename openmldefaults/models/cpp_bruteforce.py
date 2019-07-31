@@ -3,6 +3,7 @@ import openmldefaults
 import os
 import subprocess
 import time
+import typing
 
 
 class CppDefaults(object):
@@ -15,7 +16,7 @@ class CppDefaults(object):
         if not os.path.isfile(c_executable):
             raise ValueError('Please compile C program first')
 
-    def generate_defaults(self, df, num_defaults):
+    def generate_defaults(self, df, num_defaults) -> typing.Tuple[typing.List, typing.Dict[str, typing.Any]]:
         num_configs, num_tasks = df.shape
         print(openmldefaults.utils.get_time(), 'Started c program')
         process = subprocess.Popen([self.c_executable], stdout=subprocess.PIPE,
@@ -45,16 +46,11 @@ class CppDefaults(object):
         if solution is None:
             raise ValueError('Did not interpret solution correctly')
 
-        selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx) for idx in solution['solution']]
-        print(openmldefaults.utils.get_time(), selected_defaults)
-
         results_dict = {
             'branch_and_bound': solution['branch_and_bound'],
-            'defaults': selected_defaults,
-            'indices': solution['solution'],
             'leafs_visited': solution['leafs_visited'],
             'nodes_visited': solution['nodes_visited'],
             'objective': solution['score'],
             'run_time': runtime,
         }
-        return results_dict
+        return solution['solution'], results_dict

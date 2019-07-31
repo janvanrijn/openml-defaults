@@ -79,12 +79,15 @@ def run(args):
             run_on_surrogate=args.run_on_surrogates,
             output_directory=args.output_directory,
             task_id_column=args.task_id_column,
-            override_parameters=json.loads(args.override_parameters) if args.override_parameters else None
+            skip_row_check=True,
+            override_parameters=json.loads(args.override_parameters) if args.override_parameters else None,
         )
 
         for task_id in task_ids_to_process:
             openmldefaults.experiments.run_vanilla_surrogates_on_task(
                 task_id=task_id,
+                models=[openmldefaults.models.GreedyDefaults()],
+                use_surrogates=True,
                 random_seed=random_seed,
                 search_space_identifier=args.search_space_identifier,
                 metadata_files=args.metadata_files,
@@ -97,12 +100,13 @@ def run(args):
                 normalize_a3r=args.normalize_a3r,
                 surrogate_n_estimators=args.n_estimators,
                 surrogate_minimum_evals=args.minimum_evals,
-                consider_runtime=False,
+                runtime_column=None,
                 consider_a3r=False,
                 run_on_surrogate=args.run_on_surrogates,
                 task_limit=args.task_limit,
                 output_directory=args.output_directory,
                 task_id_column=args.task_id_column,
+                skip_row_check=True,
                 override_parameters=json.loads(args.override_parameters) if args.override_parameters else None
             )
 
