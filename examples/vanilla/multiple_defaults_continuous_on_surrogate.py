@@ -47,8 +47,8 @@ def parse_args():
 
 
 def run(args):
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
+
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     task_ids = None
     for arff_file in args.metadata_files:

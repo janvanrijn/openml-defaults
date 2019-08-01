@@ -190,8 +190,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
 
 def run(args):
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
                                                                   args.random_seed,
