@@ -27,12 +27,6 @@ class PowerTransformer(ABCTransformer):
         return param_value ** meta_feature_value
 
 
-class MultiplyTransformer(ABCTransformer):
-    @staticmethod
-    def transform(param_value: float, meta_feature_value: float) -> float:
-        return param_value * meta_feature_value
-
-
 class LogTransformer(ABCTransformer):
     @staticmethod
     def transform(param_value: float, meta_feature_value: float) -> float:
@@ -49,7 +43,6 @@ def all_transform_fns() -> typing.Dict[str, ABCTransformer]:
     transform_fns = {
         'inverse_transformer': InverseTransformer(),
         'power_transformer': PowerTransformer(),
-        'multiply_transformer': MultiplyTransformer(),
         'log_transformer': LogTransformer(),
         'root_transformer': RootTransformer(),
     }

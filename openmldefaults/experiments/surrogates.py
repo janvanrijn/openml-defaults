@@ -233,9 +233,11 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
 
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
     classifier_identifier = '__'.join(sorted(classifier_names))
-    config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
-                                                                  random_seed,
-                                                                  search_space_identifier)
+    configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(
+        openmldefaults.config_spaces.get_config_spaces(classifier_names,
+                                                       random_seed,
+                                                       search_space_identifier)
+    )
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
                                                                   search_space_identifier,
                                                                   measures,
@@ -258,10 +260,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     config_frame_tr = dict()
     config_frame_te = dict()
     measures_normalize = [(scoring, normalize_base)]
-
-    configurations_sampled = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
-                              for c in config_space.sample_configuration(n_defaults)]
-    logging.info('Sampled Configurations: %s' % configurations_sampled)
+    
     if runtime_column:
         measures_normalize.append((runtime_column, normalize_base))
     for measure, normalize in measures_normalize:
