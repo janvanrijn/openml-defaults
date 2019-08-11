@@ -72,6 +72,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     np.random.seed(random_seed)
     logging.info('Starting Random Search Experiment')
     usercpu_time = 'usercpu_time_millis'
+    n_configurations = n_defaults * 10  # TODO modularize
     measures = [scoring]
     if consider_runtime:
         measures = [scoring, usercpu_time]
@@ -82,9 +83,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
-    configurations = [override_parameter_in_conf(c.get_dictionary(), override_parameters)
-                      for c in config_space.sample_configuration(n_defaults)]
-    logging.info(configurations)
+    configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(config_space)
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
                                                                   search_space_identifier,
                                                                   measures,
@@ -95,15 +94,25 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
     config_frame = dict()
     for measure in measures:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(metadata_frame,
-                                                                                      config_space,
-                                                                                      measure,
-                                                                                      surrogate_minimum_evals,
-                                                                                      surrogate_n_estimators,
-                                                                                      random_seed,
-                                                                                      task_id_column)
+        surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(
+            metadata_frame=metadata_frame,
+            hyperparameter_names=config_space.get_hyperparameter_names(),
+            scoring=measure,
+            minimum_evals=surrogate_minimum_evals,
+            n_estimators=surrogate_n_estimators,
+            random_seed=random_seed,
+            task_id_column=task_id_column,
+        )
         config_frame[measure] = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates, columns, task_ids, config_space, configurations, None, None, -1)
+            surrogates=surrogates,
+            surrogate_columns=columns,
+            task_ids=task_ids,
+            config_sampler=configuration_sampler,
+            n_configurations=n_configurations,
+            scaler_type=None,
+            column_prefix=None,
+            fill_nans=-1,
+        )
 
     for task_id in task_ids:
         result_directory = os.path.join(output_directory, classifier_identifier,
@@ -228,16 +237,16 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     logging.info('Starting Default Search Experiment on Task %s' % task_id)
     a3r = 'a3r'
     measures = [scoring]
+    n_configurations = n_defaults * 10  # TODO modularize
     if runtime_column:
         measures = [scoring, runtime_column]
 
     classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
     classifier_identifier = '__'.join(sorted(classifier_names))
-    configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(
-        openmldefaults.config_spaces.get_config_spaces(classifier_names,
-                                                       random_seed,
-                                                       search_space_identifier)
-    )
+    config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
+                                                                  random_seed,
+                                                                  search_space_identifier)
+    configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(config_space)
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
                                                                   search_space_identifier,
                                                                   measures,
@@ -266,29 +275,61 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     for measure, normalize in measures_normalize:
         logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
         if use_surrogates:
-            surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(metadata_frame,
-                                                                                          config_space,
-                                                                                          measure,
-                                                                                          surrogate_minimum_evals,
-                                                                                          surrogate_n_estimators,
-                                                                                          random_seed,
-                                                                                          task_id_column)
+            surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(
+                metadata_frame=metadata_frame,
+                hyperparameter_names=configuration_sampler.get_hyperparameter_names(),
+                scoring=measure,
+                minimum_evals=surrogate_minimum_evals,
+                n_estimators=surrogate_n_estimators,
+                random_seed=random_seed,
+                task_id_column=task_id_column
+            )
             frame_tr = openmldefaults.utils.generate_dataset_using_surrogates(
-                surrogates, columns, tasks_tr, config_space, configurations_sampled, normalize, None, None)
+                surrogates=surrogates,
+                surrogate_columns=columns,
+                task_ids=tasks_tr,
+                config_sampler=configuration_sampler,
+                n_configurations=n_configurations,
+                scaler_type=normalize,
+                column_prefix=None,
+                fill_nans=None
+            )
         else:
             surrogates = None
             columns = None
             frame_tr = openmldefaults.utils.generate_dataset_using_metadata(
-                metadata_frame, tasks_tr, config_space, measure, task_id_column, normalize, None)
+                metadata_frame=metadata_frame,
+                task_ids=tasks_tr,
+                hyperparameter_names=configuration_sampler.get_hyperparameter_names(),
+                measure=measure,
+                task_id_column=task_id_column,
+                scaler_type=normalize,
+                column_prefix=None,
+            )
         config_frame_tr[measure] = frame_tr
         if task_id:
             # NEVER! Normalize the test frame
             if use_surrogates:
                 frame_te = openmldefaults.utils.generate_dataset_using_surrogates(
-                    surrogates, columns, tasks_te, config_space, configurations_sampled, None, None, None)
+                    surrogates=surrogates,
+                    surrogate_columns=columns,
+                    task_ids=tasks_te,
+                    config_sampler=configuration_sampler,
+                    n_configurations=n_configurations,
+                    scaler_type=None,
+                    column_prefix=None,
+                    fill_nans=None
+                )
             else:
                 frame_te = openmldefaults.utils.generate_dataset_using_metadata(
-                    metadata_frame, tasks_te, config_space, measure, task_id_column, None, None)
+                    metadata_frame=metadata_frame,
+                    task_ids=tasks_te,
+                    hyperparameter_names=configuration_sampler.get_hyperparameter_names(),
+                    measure=measure,
+                    task_id_column=task_id_column,
+                    scaler_type=None,
+                    column_prefix=None,
+                )
             config_frame_te[measure] = frame_te
             logging.info('Ranges test task %s for measure %s [%f-%f]:' % (task_id,
                                                                           measure,

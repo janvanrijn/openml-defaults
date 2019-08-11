@@ -1,14 +1,15 @@
 import abc
 import ConfigSpace
-import openmldefaults
 import typing
+
+from openmldefaults.symbolic import ABCTransformer
 
 
 class SymbolicConfigurationValue(object):
 
     def __init__(self,
                  value: typing.Any,
-                 transformer: typing.Optional[openmldefaults.symbolic.ABCTransformer],
+                 transformer: typing.Optional[ABCTransformer],
                  meta_feature: typing.Optional[str]):
         self.value = value
         self.transformer = transformer
@@ -38,6 +39,9 @@ class ConfigurationSampler(abc.ABC):
     def sample_configurations(self, n_configurations: int) -> typing.List[SymbolicConfiguration]:
         raise NotImplementedError()
 
+    def get_hyperparameter_names(self) -> typing.List[str]:
+        raise NotImplementedError()
+
 
 class VanillaConfigurationSpaceSampler(ConfigurationSampler):
 
@@ -46,8 +50,11 @@ class VanillaConfigurationSpaceSampler(ConfigurationSampler):
 
     def sample_configuration(self) -> SymbolicConfiguration:
         return SymbolicConfiguration({
-            p: SymbolicConfigurationValue(v, None, None) for p, v in self.configuration_space.sample_configuration(1)
+            p: SymbolicConfigurationValue(v, None, None) for p, v in self.configuration_space.sample_configuration(1)[0]
         })
 
     def sample_configurations(self, n_configurations: int) -> typing.List[SymbolicConfiguration]:
         return [self.sample_configuration() for _ in range(n_configurations)]
+
+    def get_hyperparameter_names(self) -> typing.List[str]:
+        return self.configuration_space.get_hyperparameter_names()

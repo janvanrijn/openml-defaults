@@ -105,7 +105,7 @@ def generate_grid_configurations(config_space: ConfigSpace.ConfigurationSpace,
 
 
 def train_surrogate_on_task(task_id: typing.Union[int, str],
-                            config_space: ConfigSpace.ConfigurationSpace,
+                            hyperparameter_names: typing.List[str],
                             setup_data: pd.DataFrame,
                             evaluation_measure: str,
                             normalize: bool,
@@ -116,7 +116,7 @@ def train_surrogate_on_task(task_id: typing.Union[int, str],
     Trains a surrogate on the meta-data from a task.
     """
     # delete unnecessary columns
-    legal_columns = set(config_space.get_hyperparameter_names() + [evaluation_measure])
+    legal_columns = set(hyperparameter_names + [evaluation_measure])
     for column in setup_data.columns.values:
         if column not in legal_columns:
             del setup_data[column]
@@ -142,7 +142,7 @@ def train_surrogate_on_task(task_id: typing.Union[int, str],
         assert math.isclose(max_val, 1.0), 'Not close to 1.0: %f' % max_val
 
     # assert that we have ample values for all categorical options
-    for hyperparameter in config_space:
+    for hyperparameter in hyperparameter_names:
         if isinstance(hyperparameter, ConfigSpace.CategoricalHyperparameter):
             for value in hyperparameter.choices:
                 num_occurances = len(setup_data.loc[setup_data[hyperparameter.name] == value])
@@ -185,7 +185,7 @@ def train_surrogate_on_task(task_id: typing.Union[int, str],
 def generate_dataset_using_metadata(
         metadata_frame: pd.DataFrame,
         task_ids: typing.List[typing.Union[int, str]],
-        config_space: ConfigSpace.ConfigurationSpace,
+        hyperparameter_names: typing.List[str],
         measure: str,
         task_id_column: str,
         scaler_type: typing.Optional[str],
@@ -197,7 +197,7 @@ def generate_dataset_using_metadata(
     the scoring of that configuration on that task.
     """
     pivoted = pd.pivot_table(data=metadata_frame,
-                             index=config_space.get_hyperparameter_names(),
+                             index=hyperparameter_names,
                              columns=task_id_column,
                              values=measure)
     if pivoted.isnull().values.any():
@@ -215,8 +215,8 @@ def generate_dataset_using_surrogates(
         surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
         surrogate_columns: np.array,
         task_ids: typing.List[typing.Union[int, str]],
-        config_space: ConfigSpace.ConfigurationSpace,
-        configurations: typing.List[typing.Dict[str, typing.Union[str, int, float, bool, None]]],
+        config_sampler: openmldefaults.symbolic.ConfigurationSampler,
+        n_configurations: int,
         scaler_type: typing.Optional[str],
         column_prefix: typing.Optional[str],
         fill_nans: typing.Optional[float]) -> pd.DataFrame:
@@ -234,11 +234,11 @@ def generate_dataset_using_surrogates(
     task_ids: list
         A list of tasks to include in the resulting frame (note that each
         task must be a key in the surrogates dict, or an error will be thrown)
-    config_space: ConfigSpace.ConfigurationSpace
-        Determines which hyperparameters are relevant
-    configurations: List[Dict[str, mixed]]
-        A list of dicts, each dict mapping from hyperparameter name to
-        hyperparameter value
+    config_sampler: ConfigurationSampler
+        Used to sample configurations
+    n_configurations: int
+        The number of configurations to sample (should be higher than the number
+        of defaults)
     scaler_type: str (optional)
         Which scalar to use for the resulting data frame (see function:
         openmldefaults.utils.get_scaler)
@@ -265,8 +265,9 @@ def generate_dataset_using_surrogates(
         df_ = df_[surrogate_columns]
         return df_
 
+    configurations = config_sampler.sample_configurations(n_configurations)
     for configuration in configurations:
-        illegal = set(configuration.keys()) - set(config_space.get_hyperparameter_names())
+        illegal = set(configuration.keys()) - set(config_sampler.get_hyperparameter_names())
         if len(illegal) > 0:
             raise ValueError('Configuration contains illegal hyperparameters: %s' % illegal)
 
@@ -293,13 +294,13 @@ def generate_dataset_using_surrogates(
                                                                                                  df_surrogate.shape[0]))
     if fill_nans:
         df_surrogate = df_surrogate.fillna(fill_nans)
-    df_surrogate = df_surrogate.set_index(config_space.get_hyperparameter_names())
+    df_surrogate = df_surrogate.set_index(config_sampler.get_hyperparameter_names())
     return df_surrogate
 
 
 def generate_surrogates_using_metadata(
         metadata_frame: pd.DataFrame,
-        config_space: ConfigSpace.ConfigurationSpace,
+        hyperparameter_names: typing.List[str],
         scoring: str,
         minimum_evals: int,
         n_estimators: int,
@@ -315,7 +316,7 @@ def generate_surrogates_using_metadata(
     metadata_frame: pd.Dataframe
         A dataframe with columns for all hyperparameters, a column indicating the
         task and a column indicating the scoring
-    config_space: ConfigSpace.ConfigurationSpace
+    hyperparameter_names: list[str]
         Determines which hyperparameters are relevant
     scoring: str
         The optimization criterion. Should be a column of meta-data frame
@@ -349,7 +350,7 @@ def generate_surrogates_using_metadata(
 
         del setup_frame[task_id_column]
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
-                                                                          config_space,
+                                                                          hyperparameter_names,
                                                                           setup_frame,
                                                                           scoring,
                                                                           False,  # we will normalize predictions
