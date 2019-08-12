@@ -20,6 +20,8 @@ class SymbolicConfigurationValue(object):
     def get_value(self, meta_features: typing.Dict[str, float]) -> typing.Union[str, float, int]:
         if self.transformer is None:
             return self.value
+        elif meta_features is None:
+            raise ValueError('Meta-features is None, while transformer fn is in place. ')
         return self.transformer.transform(self.value, meta_features[self.meta_feature])
 
 
@@ -28,7 +30,7 @@ class SymbolicConfiguration(object):
     def __init__(self, configuration: typing.Dict[str, SymbolicConfigurationValue]):
         self.configuration = configuration
 
-    def get_dictionary(self, meta_features: typing.Dict[str, float]) -> typing.Dict[str, typing.Union[str, float, int]]:
+    def get_dictionary(self, meta_features: typing.Optional[typing.Dict[str, float]]) -> typing.Dict[str, typing.Union[str, float, int]]:
         return {
             param: symbolic_val.get_value(meta_features) for param, symbolic_val in self.configuration.items()
         }
@@ -49,9 +51,10 @@ class VanillaConfigurationSpaceSampler(ConfigurationSampler):
         self.configuration_space = configuration_space
 
     def sample_configuration(self) -> SymbolicConfiguration:
-        return SymbolicConfiguration({
-            p: SymbolicConfigurationValue(v, None, None) for p, v in self.configuration_space.sample_configuration(1)[0]
-        })
+        result = dict()
+        for p, v in self.configuration_space.sample_configuration().get_dictionary().items():
+            result[p] = SymbolicConfigurationValue(v, None, None)
+        return SymbolicConfiguration(result)
 
     def sample_configurations(self, n_configurations: int) -> typing.List[SymbolicConfiguration]:
         return [self.sample_configuration() for _ in range(n_configurations)]

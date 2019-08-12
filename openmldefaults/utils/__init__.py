@@ -1,5 +1,4 @@
 from .df import *
-from .experiment import *
 from .io import *
 from .openml import *
 from .misc import *

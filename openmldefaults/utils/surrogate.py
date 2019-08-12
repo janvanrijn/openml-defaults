@@ -215,6 +215,7 @@ def generate_dataset_using_surrogates(
         surrogates: typing.Dict[int, sklearn.pipeline.Pipeline],
         surrogate_columns: np.array,
         task_ids: typing.List[typing.Union[int, str]],
+        meta_features: pd.DataFrame,
         config_sampler: openmldefaults.symbolic.ConfigurationSampler,
         n_configurations: int,
         scaler_type: typing.Optional[str],
@@ -234,6 +235,9 @@ def generate_dataset_using_surrogates(
     task_ids: list
         A list of tasks to include in the resulting frame (note that each
         task must be a key in the surrogates dict, or an error will be thrown)
+    meta_features: pd.DataFrame
+        A dataframe with as index a task id and as columns the relevant
+        meta-features
     config_sampler: ConfigurationSampler
         Used to sample configurations
     n_configurations: int
@@ -255,32 +259,35 @@ def generate_dataset_using_surrogates(
         A dataframe with all configurations set to the index, and all tasks as
         columns.
     """
-    def complete_dataframe(df_: pd.DataFrame) -> pd.DataFrame:
-        for column_ in surrogate_columns:
+    def complete_dataframe(df_: pd.DataFrame, surrogate_column_order: np.array) -> pd.DataFrame:
+        """
+        Adds several columns to a dataframe, in case they were missing before.
+        Also removes other columns and sets the columns in the correct order.
+        """
+        for column_ in surrogate_column_order:
             if column_ not in df_:
                 impute_value = np.nan
                 logging.info('Adding column to meta-dataset: %s. Imputing with %s' % (column_, impute_value))
                 df_[column_] = impute_value
         # reorders columns to order required for surrogate (if columns were added)
-        df_ = df_[surrogate_columns]
+        df_ = df_[surrogate_column_order]
         return df_
 
     configurations = config_sampler.sample_configurations(n_configurations)
     for configuration in configurations:
-        illegal = set(configuration.keys()) - set(config_sampler.get_hyperparameter_names())
+        illegal = set(configuration.get_dictionary(None).keys()) - set(config_sampler.get_hyperparameter_names())
         if len(illegal) > 0:
-            raise ValueError('Configuration contains illegal hyperparameters: %s' % illegal)
+            raise ValueError('Configuration contains illegal hyper-parameters: %s' % illegal)
 
-    df_orig = pd.DataFrame(configurations)
-    # adds missing columns and reorders
-    df_orig = complete_dataframe(df_orig)
+    df_orig = pd.DataFrame([{'configuration': c} for c in configurations])
 
-    # copy of df_orig. Prevent copy function for correct type hints
-    df_surrogate = pd.DataFrame(configurations)
-    # adds missing columns and reorders
-    df_surrogate = complete_dataframe(df_surrogate)
     for task_id in task_ids:
-        surrogate_values = surrogates[task_id].predict(df_orig.values)
+        # TODO:
+        # 1) get hyperparameter values
+        # 2) get them in right order (as given by surrogate_columns)
+        df_task = pd.DataFrame([c.get_dictionary(meta_features.loc[task_id]) for c in configurations])
+        df_task = complete_dataframe(df_task, surrogate_columns)
+        surrogate_values = surrogates[task_id].predict(df_task.values)
         if scaler_type is not None:
             logging.info('scaling predictions for task %s using %s' % (task_id, scaler_type))
             scaler = openmldefaults.utils.get_scaler(scaler_type)
@@ -288,14 +295,14 @@ def generate_dataset_using_surrogates(
         column_name = 'task_%s' % task_id
         if column_prefix:
             column_name = '%s_%s' % (column_prefix, column_name)
-        df_surrogate[column_name] = surrogate_values
-    if df_surrogate.shape[0] != len(configurations):
-        raise ValueError('surrogate frame has wrong number of instances. Expected: %d Got %d' % (len(configurations),
-                                                                                                 df_surrogate.shape[0]))
+        df_orig[column_name] = surrogate_values
+    if len(df_orig) != len(configurations):
+        raise ValueError('surrogate frame has wrong number of instances.'
+                         'Expected: %d Got %d' % (len(configurations), len(df_orig)))
     if fill_nans:
-        df_surrogate = df_surrogate.fillna(fill_nans)
-    df_surrogate = df_surrogate.set_index(config_sampler.get_hyperparameter_names())
-    return df_surrogate
+        df_orig = df_orig.fillna(fill_nans)
+    df_orig = df_orig.set_index('configuration')
+    return df_orig
 
 
 def generate_surrogates_using_metadata(

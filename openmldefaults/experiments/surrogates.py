@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import openml
+import openmlcontrib
 import openmldefaults
 import os
 import pickle
@@ -90,6 +91,11 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                                                   task_id_column,
                                                                   skip_row_check=skip_row_check)
     task_ids = list(metadata_frame[task_id_column].unique())
+    meta_features = openmlcontrib.meta.get_tasks_qualities_as_dataframe(task_ids, False, -1.0, True, False)
+    if set(task_ids) != set(meta_features.index.values):
+        missing = set(task_ids) - set(meta_features.index.values)
+        logging.warning('Could not obtain meta-features for tasks %s, dropping. ' % missing)
+        task_ids = list(meta_features.index.values)
 
     config_frame = dict()
     for measure in measures:
@@ -107,6 +113,7 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
             surrogates=surrogates,
             surrogate_columns=columns,
             task_ids=task_ids,
+            meta_features=meta_features,
             config_sampler=configuration_sampler,
             n_configurations=n_configurations,
             scaler_type=None,
@@ -119,7 +126,8 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
                                         str(task_id), strategy_name,
                                         str(n_defaults), str(random_seed))
         if run_on_surrogate:
-            result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults, minimize_measure))
+            result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
+                                                                                                  minimize_measure))
             if not os.path.exists(result_filepath_surrogated):
                 openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
                                                                    config_frame[usercpu_time] if consider_runtime else None,
@@ -135,8 +143,12 @@ def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: 
         else:
             result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize_measure))
             if not os.path.exists(result_filepath_live):
-                configs = [openmldefaults.utils.selected_row_to_config_dict(config_frame[scoring], idx, config_space) for idx in range(len(config_frame[scoring]))]
-                scores = get_scores_live(task_id, configs, search_space_identifier, scoring)
+                task_meta_features = meta_features.loc[task_id].to_dict()
+                configs = [
+                    config_frame[scoring].index[idx].get_dictionary(task_meta_features)
+                    for idx in range(len(config_frame[scoring]))  # simple enumeration, since it is random search
+                ]
+                scores = get_scores_live(int(task_id), configs, search_space_identifier, scoring)
                 with open(result_filepath_live, 'wb') as fp:
                     pickle.dump(scores, fp, protocol=0)
                 logging.info('live results generated, saved to: %s' % result_filepath_live)
