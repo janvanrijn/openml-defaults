@@ -1,6 +1,5 @@
 import arff
 import argparse
-import json
 import logging
 import numpy as np
 import openmlcontrib
@@ -34,10 +33,10 @@ def parse_args():
     parser.add_argument('--normalize_a3r', type=str, default='StandardScaler')
     parser.add_argument('--a3r_r', type=int, default=1)
     parser.add_argument('--aggregate', type=str, choices=openmldefaults.experiments.AGGREGATES, default='sum')
-    parser.add_argument('--n_defaults', type=int, default=32)
+    parser.add_argument('--defaults_sizes', type=int, nargs='+', default=[1, 2, 4, 8, 16, 32, 64])
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--minimum_evals', type=int, default=128)
-    parser.add_argument('--random_iterations', type=int, default=1)
+    parser.add_argument('--random_seed', type=int, default=1)
     parser.add_argument('--run_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     parser.add_argument('--task_id_column', default='task_id', type=str)
@@ -62,33 +61,38 @@ def run(args):
     else:
         task_ids_to_process = [task_ids[args.task_idx]]
 
+    models = [
+        openmldefaults.models.GreedyDefaults(),
+        openmldefaults.models.RandomDefaults(),
+        openmldefaults.models.AverageRankDefaults(),
+    ]
+
     # run random search
-    for random_seed in range(args.random_iterations):
-        for task_id in task_ids_to_process:
-            openmldefaults.experiments.run_vanilla_surrogates_on_task(
-                task_id=task_id,
-                models=[openmldefaults.models.GreedyDefaults(), openmldefaults.models.RandomDefaults()],
-                use_surrogates=True,
-                random_seed=random_seed,
-                search_space_identifier=args.search_space_identifier,
-                metadata_files=args.metadata_files,
-                scoring=args.scoring,
-                minimize_measure=args.minimize,
-                n_defaults=args.n_defaults,
-                aggregate=args.aggregate,
-                a3r_r=args.a3r_r,
-                normalize_base=args.normalize_base,
-                normalize_a3r=args.normalize_a3r,
-                surrogate_n_estimators=args.n_estimators,
-                surrogate_minimum_evals=args.minimum_evals,
-                runtime_column=None,
-                consider_a3r=False,
-                evaluate_on_surrogate=args.run_on_surrogates,
-                task_limit=args.task_limit,
-                output_directory=args.output_directory,
-                task_id_column=args.task_id_column,
-                skip_row_check=True
-            )
+    for task_id in task_ids_to_process:
+        openmldefaults.experiments.run_vanilla_surrogates_on_task(
+            task_id=task_id,
+            models=models,
+            use_surrogates=True,
+            random_seed=args.random_seed,
+            search_space_identifier=args.search_space_identifier,
+            metadata_files=args.metadata_files,
+            scoring=args.scoring,
+            minimize_measure=args.minimize,
+            defaults_sizes=args.defaults_sizes,
+            aggregate=args.aggregate,
+            a3r_r=args.a3r_r,
+            normalize_base=args.normalize_base,
+            normalize_a3r=args.normalize_a3r,
+            surrogate_n_estimators=args.n_estimators,
+            surrogate_minimum_evals=args.minimum_evals,
+            runtime_column=None,
+            consider_a3r=False,
+            evaluate_on_surrogate=args.run_on_surrogates,
+            task_limit=args.task_limit,
+            output_directory=args.output_directory,
+            task_id_column=args.task_id_column,
+            skip_row_check=True
+        )
 
 
 if __name__ == '__main__':

@@ -66,7 +66,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    random_seed: int,
                                    search_space_identifier: typing.Optional[str],
                                    scoring: str, minimize_measure: bool,
-                                   n_defaults: typing.Optional[int], aggregate: str, a3r_r: int,
+                                   defaults_sizes: typing.List[int],
+                                   aggregate: str, a3r_r: int,
                                    normalize_base: str, normalize_a3r: str,
                                    surrogate_n_estimators: int,
                                    surrogate_minimum_evals: int,
@@ -107,10 +108,9 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
         The main measure to consider. Note that this has to be a column in all dataframes loaded from metadata_files
     minimize_measure: str
         Whether to minimize this measure (e.g., loss should be minimized, whereas accuracy should be maximized)
-    n_defaults: int (optional)
-        The number of defaults that needs to be generated. Note that depending on the search criterion, active testing
-        can not always generate this number of defaults. If set to None, the number of defaults in the meta-data is
-        used.
+    defaults_sizes: List[int]
+        For each entry of the list, the number of defaults that needs to be generated. Note that depending on the
+        search criterion, active testing can not always generate this number of defaults.
     aggregate: str
         Determines how to aggregate scores per train task
     a3r_r: str
@@ -149,7 +149,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     logging.info('Starting Default Search Experiment on Task %s' % task_id)
     a3r = 'a3r'
     measures = [scoring]
-    n_configurations = n_defaults * 10  # TODO modularize
+    n_configurations = defaults_sizes[-1] * 10  # TODO modularize
     if runtime_column:
         measures = [scoring, runtime_column]
 
@@ -272,58 +272,58 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
         for measure, minimize in [(scoring, minimize_measure), (runtime_column, True), (a3r, minimize_measure)]:
             if measure not in config_frame_tr:
                 continue
+            for n_defaults in defaults_sizes:
+                logging.info('Started measure %s, minimize: %d, n_defaults %d' % (measure, minimize, n_defaults))
+                strategy = '%s_%s_%s' % (model.name, 'min' if minimize else 'max', measure)
+                result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy,
+                                                str(n_defaults), str(random_seed), aggregate, str(a3r_r),
+                                                str(normalize_base), str(normalize_a3r))
+                os.makedirs(result_directory, exist_ok=True)
+                result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
 
-            logging.info('Started measure %s, minimize: %d' % (measure, minimize))
-            strategy = '%s_%s_%s' % (model.name, 'min' if minimize else 'max', measure)
-            result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy,
-                                            str(n_defaults), str(random_seed), aggregate, str(a3r_r), str(normalize_base),
-                                            str(normalize_a3r))
-            os.makedirs(result_directory, exist_ok=True)
-            result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
+                if os.path.isfile(result_filepath_defaults):
+                    logging.info('will load defaults from: %s' % result_filepath_defaults)
+                    with open(result_filepath_defaults, 'rb') as fp:
+                        result_indices, result_defaults, meta_data = pickle.load(fp)
+                else:
+                    result_indices, meta_data = model.generate_defaults_discretized(
+                        config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], config_space, False)
+                    if len(result_indices) == 0:
+                        raise ValueError('No defaults selected')
+                    task_meta_features = meta_features.loc[task_id].to_dict()
+                    result_defaults = [
+                        config_frame_tr[scoring].index[idx].get_dictionary(task_meta_features) for idx in result_indices
+                    ]
 
-            if os.path.isfile(result_filepath_defaults):
-                logging.info('will load defaults from: %s' % result_filepath_defaults)
-                with open(result_filepath_defaults, 'rb') as fp:
-                    result_indices, result_defaults, meta_data = pickle.load(fp)
-            else:
-                result_indices, meta_data = model.generate_defaults_discretized(
-                    config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], config_space, False)
-                if len(result_indices) == 0:
-                    raise ValueError('No defaults selected')
-                task_meta_features = meta_features.loc[task_id].to_dict()
-                result_defaults = [
-                    config_frame_tr[scoring].index[idx].get_dictionary(task_meta_features) for idx in result_indices
-                ]
+                    with open(result_filepath_defaults, 'wb') as fp:
+                        pickle.dump([result_indices, result_defaults, meta_data], fp, protocol=0)
+                    logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
 
-                with open(result_filepath_defaults, 'wb') as fp:
-                    pickle.dump([result_indices, result_defaults, meta_data], fp, protocol=0)
-                logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
-
-            if not task_id:
-                logging.warning('No test task id specified. Will not perform experiment.')
-            else:
-                if evaluate_on_surrogate:
-                    result_filepath_experiment = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
-                                                                                                          minimize))
-                    if not os.path.exists(result_filepath_experiment):
-                        openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
-                                                                           config_frame_te[runtime_column] if runtime_column else None,
-                                                                           task_id,
-                                                                           result_indices,
-                                                                           scoring,
-                                                                           runtime_column,
-                                                                           minimize_measure,
-                                                                           result_filepath_experiment)
-                        logging.info('surrogated results generated, saved to: %s' % result_filepath_experiment)
-                    else:
-                        logging.info('surrogated results already exists, see: %s' % result_filepath_experiment)
-                else:  # run on live
-                    result_filepath_experiment = os.path.join(result_directory, 'live_%d_%d.pkl' % (n_defaults,
-                                                                                                    minimize))
-                    if not os.path.exists(result_filepath_experiment):
-                        scores = get_scores_live(task_id, result_defaults, search_space_identifier, scoring)
-                        with open(result_filepath_experiment, 'wb') as fp:
-                            pickle.dump(scores, fp, protocol=0)
-                        logging.info('live results generated, saved to: %s' % result_filepath_experiment)
-                    else:
-                        logging.info('live results already exists, see: %s' % result_filepath_experiment)
+                if not task_id:
+                    logging.warning('No test task id specified. Will not perform experiment.')
+                else:
+                    if evaluate_on_surrogate:
+                        result_filepath_experiment = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
+                                                                                                              minimize))
+                        if not os.path.exists(result_filepath_experiment):
+                            openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
+                                                                               config_frame_te[runtime_column] if runtime_column else None,
+                                                                               task_id,
+                                                                               result_indices,
+                                                                               scoring,
+                                                                               runtime_column,
+                                                                               minimize_measure,
+                                                                               result_filepath_experiment)
+                            logging.info('surrogated results generated, saved to: %s' % result_filepath_experiment)
+                        else:
+                            logging.info('surrogated results already exists, see: %s' % result_filepath_experiment)
+                    else:  # run on live
+                        result_filepath_experiment = os.path.join(result_directory, 'live_%d_%d.pkl' % (n_defaults,
+                                                                                                        minimize))
+                        if not os.path.exists(result_filepath_experiment):
+                            scores = get_scores_live(task_id, result_defaults, search_space_identifier, scoring)
+                            with open(result_filepath_experiment, 'wb') as fp:
+                                pickle.dump(scores, fp, protocol=0)
+                            logging.info('live results generated, saved to: %s' % result_filepath_experiment)
+                        else:
+                            logging.info('live results already exists, see: %s' % result_filepath_experiment)

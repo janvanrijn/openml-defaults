@@ -68,9 +68,6 @@ class AverageRankDefaults(DefaultsGenerator):
         inv_avg_ranks = df.rank(axis=0, method='average', ascending=minimize).sum(axis=1) / df.shape[1]
         selected_indices = list(np.argsort(inv_avg_ranks.values))
 
-        selected_defaults = [openmldefaults.utils.selected_row_to_config_dict(df, idx, config_space) for idx in selected_indices]
-        logging.info(selected_defaults)
-
         results_dict = {
             'run_time': time.time() - start_time,
         }
