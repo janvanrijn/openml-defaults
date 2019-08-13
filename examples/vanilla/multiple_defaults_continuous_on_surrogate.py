@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--minimum_evals', type=int, default=128)
     parser.add_argument('--random_seed', type=int, default=1)
-    parser.add_argument('--run_on_surrogates', action='store_true')
+    parser.add_argument('--evaluate_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     parser.add_argument('--task_id_column', default='task_id', type=str)
     args_ = parser.parse_args()
@@ -87,7 +87,7 @@ def run(args):
             surrogate_minimum_evals=args.minimum_evals,
             runtime_column=None,
             consider_a3r=False,
-            evaluate_on_surrogate=args.run_on_surrogates,
+            evaluate_on_surrogate=args.evaluate_on_surrogates,
             task_limit=args.task_limit,
             output_directory=args.output_directory,
             task_id_column=args.task_id_column,
