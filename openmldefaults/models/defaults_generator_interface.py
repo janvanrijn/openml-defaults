@@ -1,12 +1,10 @@
+import abc
 import ConfigSpace
 import pandas as pd
 import typing
 
 
-class DefaultsGenerator(object):
-
-    def __init__(self):
-        self.name = None
+class DefaultsGenerator(abc.ABC):
 
     def generate_defaults_discretized(self, df: pd.DataFrame, num_defaults: int,
                                       minimize: bool, aggregate: typing.Callable,

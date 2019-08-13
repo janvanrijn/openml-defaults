@@ -41,13 +41,11 @@ def parse_args():
     parser.add_argument('--run_on_surrogates', action='store_true')
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     parser.add_argument('--task_id_column', default='task_id', type=str)
-    parser.add_argument('--override_parameters', type=str)
     args_ = parser.parse_args()
     return args_
 
 
 def run(args):
-
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     task_ids = None
@@ -66,27 +64,10 @@ def run(args):
 
     # run random search
     for random_seed in range(args.random_iterations):
-        openmldefaults.experiments.run_random_search_surrogates(
-            metadata_files=args.metadata_files,
-            random_seed=random_seed,
-            search_space_identifier=args.search_space_identifier,
-            scoring=args.scoring,
-            minimize_measure=args.minimize,
-            n_defaults=args.n_defaults,
-            surrogate_n_estimators=args.n_estimators,
-            surrogate_minimum_evals=args.minimum_evals,
-            consider_runtime=False,
-            run_on_surrogate=args.run_on_surrogates,
-            output_directory=args.output_directory,
-            task_id_column=args.task_id_column,
-            skip_row_check=True,
-            override_parameters=json.loads(args.override_parameters) if args.override_parameters else None,
-        )
-
         for task_id in task_ids_to_process:
             openmldefaults.experiments.run_vanilla_surrogates_on_task(
                 task_id=task_id,
-                models=[openmldefaults.models.GreedyDefaults()],
+                models=[openmldefaults.models.GreedyDefaults(), openmldefaults.models.RandomDefaults()],
                 use_surrogates=True,
                 random_seed=random_seed,
                 search_space_identifier=args.search_space_identifier,
@@ -106,8 +87,7 @@ def run(args):
                 task_limit=args.task_limit,
                 output_directory=args.output_directory,
                 task_id_column=args.task_id_column,
-                skip_row_check=True,
-                override_parameters=json.loads(args.override_parameters) if args.override_parameters else None
+                skip_row_check=True
             )
 
 

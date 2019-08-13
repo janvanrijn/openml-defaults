@@ -59,103 +59,6 @@ def override_parameter_in_conf(configuration: typing.Dict, override_parameter: t
     return configuration
 
 
-def run_random_search_surrogates(metadata_files: typing.List[str], random_seed: int,
-                                 search_space_identifier: str, scoring: str,
-                                 minimize_measure: bool, n_defaults: int,
-                                 surrogate_n_estimators: int,
-                                 surrogate_minimum_evals: int,
-                                 consider_runtime: bool,
-                                 run_on_surrogate: bool,
-                                 output_directory: str,
-                                 task_id_column: str,
-                                 skip_row_check: bool,
-                                 override_parameters: typing.Dict[str, typing.Any]):
-    np.random.seed(random_seed)
-    logging.info('Starting Random Search Experiment')
-    usercpu_time = 'usercpu_time_millis'
-    n_configurations = n_defaults * 10  # TODO modularize
-    measures = [scoring]
-    if consider_runtime:
-        measures = [scoring, usercpu_time]
-
-    classifier_names = [os.path.splitext(os.path.basename(file))[0] for file in metadata_files]
-    classifier_identifier = '__'.join(sorted(classifier_names))
-    strategy_name = 'random_search_%s_%s' % ('min' if minimize_measure else 'max', scoring)
-    config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
-                                                                  random_seed,
-                                                                  search_space_identifier)
-    configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(config_space)
-    metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
-                                                                  search_space_identifier,
-                                                                  measures,
-                                                                  task_id_column,
-                                                                  skip_row_check=skip_row_check)
-    task_ids = list(metadata_frame[task_id_column].unique())
-    meta_features = openmlcontrib.meta.get_tasks_qualities_as_dataframe(task_ids, False, -1.0, True, False)
-    if set(task_ids) != set(meta_features.index.values):
-        missing = set(task_ids) - set(meta_features.index.values)
-        logging.warning('Could not obtain meta-features for tasks %s, dropping. ' % missing)
-        task_ids = list(meta_features.index.values)
-
-    config_frame = dict()
-    for measure in measures:
-        logging.info('Generating surrogated frames for measure: %s. Columns: %s' % (measure, metadata_frame.columns.values))
-        surrogates, columns = openmldefaults.utils.generate_surrogates_using_metadata(
-            metadata_frame=metadata_frame,
-            hyperparameter_names=config_space.get_hyperparameter_names(),
-            scoring=measure,
-            minimum_evals=surrogate_minimum_evals,
-            n_estimators=surrogate_n_estimators,
-            random_seed=random_seed,
-            task_id_column=task_id_column,
-        )
-        config_frame[measure] = openmldefaults.utils.generate_dataset_using_surrogates(
-            surrogates=surrogates,
-            surrogate_columns=columns,
-            task_ids=task_ids,
-            meta_features=meta_features,
-            config_sampler=configuration_sampler,
-            n_configurations=n_configurations,
-            scaler_type=None,
-            column_prefix=None,
-            fill_nans=-1,
-        )
-
-    for task_id in task_ids:
-        result_directory = os.path.join(output_directory, classifier_identifier,
-                                        str(task_id), strategy_name,
-                                        str(n_defaults), str(random_seed))
-        if run_on_surrogate:
-            result_filepath_surrogated = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
-                                                                                                  minimize_measure))
-            if not os.path.exists(result_filepath_surrogated):
-                openmldefaults.utils.store_surrogate_based_results(config_frame[scoring],
-                                                                   config_frame[usercpu_time] if consider_runtime else None,
-                                                                   task_id,
-                                                                   list(range(n_defaults)),
-                                                                   scoring,
-                                                                   usercpu_time,
-                                                                   minimize_measure,
-                                                                   result_filepath_surrogated)
-                logging.info('surrogated random search results generated, saved to: %s' % result_filepath_surrogated)
-            else:
-                logging.info('surrogated random search results already exists, see: %s' % result_filepath_surrogated)
-        else:
-            result_filepath_live = os.path.join(result_directory, 'live_%d_%d.csv' % (n_defaults, minimize_measure))
-            if not os.path.exists(result_filepath_live):
-                task_meta_features = meta_features.loc[task_id].to_dict()
-                configs = [
-                    config_frame[scoring].index[idx].get_dictionary(task_meta_features)
-                    for idx in range(len(config_frame[scoring]))  # simple enumeration, since it is random search
-                ]
-                scores = get_scores_live(int(task_id), configs, search_space_identifier, scoring)
-                with open(result_filepath_live, 'wb') as fp:
-                    pickle.dump(scores, fp, protocol=0)
-                logging.info('live results generated, saved to: %s' % result_filepath_live)
-            else:
-                logging.info('live results already exists, see: %s' % result_filepath_live)
-
-
 def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    metadata_files: typing.List[str],
                                    models: typing.List[DefaultsGenerator],
@@ -173,8 +76,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    run_on_surrogate: bool,
                                    output_directory: str,
                                    task_id_column: str,
-                                   skip_row_check: bool,
-                                   override_parameters: typing.Dict[str, typing.Any]):
+                                   skip_row_check: bool):
     """
     Flexible running script that performs experiments based on surrogated default generation on a single task.
     Has capabilities to use active testing, combine various search spaces and incorporate A3R.
@@ -237,8 +139,6 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     skip_row_check: bool
         Usually the config space library checks for every configuration whether it falls within a given config space.
         This can be disabled (speed)
-    override_parameters: dict
-        TODO jan
     """
     np.random.seed(random_seed)
     if a3r_r % 2 == 0 and normalize_base == 'StandardScaler':
@@ -268,7 +168,17 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
 
     # this ensures that we only take tasks on which a surrogate was trained
     # (note that not all tasks do have meta-data, due to problems on OpenML)
-    tasks_tr = list(metadata_frame[task_id_column].unique())
+    tasks_all = list(metadata_frame[task_id_column].unique())
+    # obtain meta-features
+    meta_features = openmlcontrib.meta.get_tasks_qualities_as_dataframe(tasks_all, False, -1.0, True, False)
+    if set(tasks_all) != set(meta_features.index.values):
+        missing = set(tasks_all) - set(meta_features.index.values)
+        if task_id in missing:
+            raise ValueError('Missing meta-data for test task %s' % missing)
+        logging.warning('Could not obtain meta-features for tasks %s, dropping. ' % missing)
+        tasks_all = list(meta_features.index.values)
+
+    tasks_tr = list(tasks_all)
     # remove train task from list
     if task_id is not None:
         tasks_tr.remove(task_id)
@@ -300,6 +210,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                 surrogates=surrogates,
                 surrogate_columns=columns,
                 task_ids=tasks_tr,
+                meta_features=meta_features,
                 config_sampler=configuration_sampler,
                 n_configurations=n_configurations,
                 scaler_type=normalize,
@@ -326,6 +237,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                     surrogates=surrogates,
                     surrogate_columns=columns,
                     task_ids=tasks_te,
+                    meta_features=meta_features,
                     config_sampler=configuration_sampler,
                     n_configurations=n_configurations,
                     scaler_type=None,
@@ -368,8 +280,12 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                             str(normalize_a3r))
             os.makedirs(result_directory, exist_ok=True)
             result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
-            exp_type = 'surrogated' if run_on_surrogate else 'live'
-            result_filepath_experiment = os.path.join(result_directory, '%s_%d_%d.csv' % (exp_type, n_defaults, minimize))
+
+            if run_on_surrogate:
+                result_filepath_experiment = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
+                                                                                                      minimize))
+            else:
+                result_filepath_experiment = os.path.join(result_directory, 'live_%d_%d.pkl' % (n_defaults, minimize))
 
             if os.path.isfile(result_filepath_defaults):
                 logging.info('will load defaults from: %s' % result_filepath_defaults)
@@ -380,8 +296,10 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                     config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], config_space, False)
                 if len(result_indices) == 0:
                     raise ValueError('No defaults selected')
-                result_defaults = [openmldefaults.utils.selected_row_to_config_dict(
-                    config_frame_tr[measure], idx, config_space) for idx in result_indices]
+                task_meta_features = meta_features.loc[task_id].to_dict()
+                result_defaults = [
+                    config_frame_tr[scoring].index[idx].get_dictionary(task_meta_features) for idx in result_indices
+                ]
 
                 with open(result_filepath_defaults, 'wb') as fp:
                     pickle.dump([result_indices, result_defaults, meta_data], fp, protocol=0)

@@ -471,7 +471,7 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
                               list(metadata_frame_total.select_dtypes(include=['Int64']).columns)
                 bool_columns = list(metadata_frame_classif.select_dtypes(include=[bool]).columns) + \
                                list(metadata_frame_total.select_dtypes(include=[bool]).columns)
-                metadata_frame_total = metadata_frame_total.append(metadata_frame_classif)
+                metadata_frame_total = metadata_frame_total.append(metadata_frame_classif, sort=False)
                 for column in int_columns:
                     metadata_frame_total[column] = metadata_frame_total[column].astype('Int64')
                 for column in bool_columns:
