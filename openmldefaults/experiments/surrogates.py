@@ -73,7 +73,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    runtime_column: typing.Optional[str],
                                    consider_a3r: bool,
                                    task_limit: typing.Optional[int],
-                                   run_on_surrogate: bool,
+                                   evaluate_on_surrogate: bool,
                                    output_directory: str,
                                    task_id_column: str,
                                    skip_row_check: bool):
@@ -130,7 +130,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
         Whether to calculate results based on A3R
     task_limit: int (Optional)
         If set, only this number of tasks will be considered in the train set (speed)
-    run_on_surrogate: bool
+    evaluate_on_surrogate: bool
         Whether to perform a surrogated experiment or a live experiment
     output_directory: str
         Where to place the results (will create a directory structure)
@@ -281,12 +281,6 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
             os.makedirs(result_directory, exist_ok=True)
             result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
 
-            if run_on_surrogate:
-                result_filepath_experiment = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
-                                                                                                      minimize))
-            else:
-                result_filepath_experiment = os.path.join(result_directory, 'live_%d_%d.pkl' % (n_defaults, minimize))
-
             if os.path.isfile(result_filepath_defaults):
                 logging.info('will load defaults from: %s' % result_filepath_defaults)
                 with open(result_filepath_defaults, 'rb') as fp:
@@ -308,7 +302,9 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
             if not task_id:
                 logging.warning('No test task id specified. Will not perform experiment.')
             else:
-                if run_on_surrogate:
+                if evaluate_on_surrogate:
+                    result_filepath_experiment = os.path.join(result_directory, 'surrogated_%d_%d.csv' % (n_defaults,
+                                                                                                          minimize))
                     if not os.path.exists(result_filepath_experiment):
                         openmldefaults.utils.store_surrogate_based_results(config_frame_te[scoring],
                                                                            config_frame_te[runtime_column] if runtime_column else None,
@@ -322,6 +318,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                     else:
                         logging.info('surrogated results already exists, see: %s' % result_filepath_experiment)
                 else:  # run on live
+                    result_filepath_experiment = os.path.join(result_directory, 'live_%d_%d.pkl' % (n_defaults,
+                                                                                                    minimize))
                     if not os.path.exists(result_filepath_experiment):
                         scores = get_scores_live(task_id, result_defaults, search_space_identifier, scoring)
                         with open(result_filepath_experiment, 'wb') as fp:

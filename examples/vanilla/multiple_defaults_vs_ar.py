@@ -81,7 +81,7 @@ def run(args):
                 surrogate_minimum_evals=args.minimum_evals,
                 runtime_column='runtime',
                 consider_a3r=True,
-                run_on_surrogate=args.run_on_surrogates,
+                evaluate_on_surrogate=args.run_on_surrogates,
                 task_limit=args.task_limit,
                 output_directory=args.output_directory,
                 task_id_column=args.task_id_column,
