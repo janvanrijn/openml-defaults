@@ -511,7 +511,7 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerow({scoring: best_score, usercpu_time: total_time, 'iteration': 0})
-        for idx in indice_order:
+        for itt_no, idx in enumerate(indice_order):
             current_score = scoring_frame.iloc[idx]['task_%s' % task_id]
             current_time = np.nan
             if timing_frame is not None:
@@ -523,7 +523,7 @@ def store_surrogate_based_results(scoring_frame: pd.DataFrame,
             else:
                 best_score = max(best_score, current_score)
             total_time = current_time + total_time
-            writer.writerow({scoring: best_score, usercpu_time: total_time, 'iteration': idx+1})
+            writer.writerow({scoring: best_score, usercpu_time: total_time, 'iteration': itt_no+1})
 
 
 def single_prediction(df: pd.DataFrame,

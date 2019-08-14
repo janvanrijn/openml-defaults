@@ -288,8 +288,13 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                 else:
                     result_indices, meta_data = model.generate_defaults_discretized(
                         config_frame_tr[measure], n_defaults, minimize, AGGREGATES[aggregate], config_space, False)
+                    # note that a result without defaults is wrong, although having less defaults than requested
+                    # is fine
                     if len(result_indices) == 0:
                         raise ValueError('No defaults selected')
+                    if len(result_indices) > n_defaults:
+                        # slice to have the exact number of requested defaults (or less)
+                        result_indices = result_indices[0: n_defaults]
                     task_meta_features = meta_features.loc[task_id].to_dict()
                     result_defaults = [
                         config_frame_tr[scoring].index[idx].get_dictionary(task_meta_features) for idx in result_indices
