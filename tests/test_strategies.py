@@ -36,20 +36,52 @@ class TestStrategies(unittest.TestCase):
         }
         return df, expected_results
 
+    @staticmethod
+    def get_dominated_dataset():
+        data = [
+            ['a0', 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            ['a1', 0.7, 0.6, 0.5, 0.4, 0.3, 0.2],
+            ['a2', 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+            ['a3', 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
+            ['a4', 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+            ['a5', 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        ]
+        columns = ['algorithm', 't0', 't1', 't2', 't3', 't4', 't5']
+        df = pd.DataFrame(data=data, columns=columns).set_index('algorithm')
+        expected_results = {
+            'average_rank': {
+                True: [5, 1, 2, 4, 3, 0],
+                False: [0, 3, 1, 2, 4, 5],
+            },
+            'greedy': {
+                True: [5],
+                False: [0],
+            },
+            'active_testing': {
+                True: [5, 1, 2, 4, 3, 0],
+                False: [0, 3, 1, 2, 4, 5],
+            },
+        }
+        return df, expected_results
+
     def test_models_on_simple_dataset(self):
+        datasets = [
+            TestStrategies.get_simple_dataset(),
+            TestStrategies.get_dominated_dataset(),
+        ]
+
         models = [
             openmldefaults.models.AverageRankDefaults(),
             openmldefaults.models.GreedyDefaults(),
             openmldefaults.models.ActiveTestingDefaults(),
         ]
 
-        df, expected_results = TestStrategies.get_simple_dataset()
-
-        for model in models:
-            for minimize in {False, True}:
-                logging.info('Testing strategy %s with minimize=%s' % (model.name, minimize))
-                indices, _ = model.generate_defaults_discretized(df, 3, minimize, np.sum, self.cs, False)
-                self.assertListEqual(indices, expected_results[model.name][minimize])
+        for df, expected_results in datasets:
+            for model in models:
+                for minimize in {False, True}:
+                    logging.info('Testing strategy %s with minimize=%s' % (model.name, minimize))
+                    indices, _ = model.generate_defaults_discretized(df, 3, minimize, np.sum, self.cs, False)
+                    self.assertListEqual(indices, expected_results[model.name][minimize])
 
     def test_average_rank_on_text_classification(self):
         ground_truth = pd.read_csv('../data/text_classification_ar.csv')

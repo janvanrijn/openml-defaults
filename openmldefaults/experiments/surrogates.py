@@ -67,6 +67,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                                    search_space_identifier: typing.Optional[str],
                                    scoring: str, minimize_measure: bool,
                                    defaults_sizes: typing.List[int],
+                                   n_configurations: int,
                                    aggregate: str, a3r_r: int,
                                    normalize_base: str, normalize_a3r: str,
                                    surrogate_n_estimators: int,
@@ -111,6 +112,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     defaults_sizes: List[int]
         For each entry of the list, the number of defaults that needs to be generated. Note that depending on the
         search criterion, active testing can not always generate this number of defaults.
+    n_configurations: int
+        Number of configurations to sample
     aggregate: str
         Determines how to aggregate scores per train task
     a3r_r: str
@@ -149,7 +152,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     logging.info('Starting Default Search Experiment on Task %s' % task_id)
     a3r = 'a3r'
     measures = [scoring]
-    n_configurations = defaults_sizes[-1] * 10  # TODO modularize
+
     if runtime_column:
         measures = [scoring, runtime_column]
 

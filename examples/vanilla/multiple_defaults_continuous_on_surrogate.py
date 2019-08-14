@@ -33,7 +33,8 @@ def parse_args():
     parser.add_argument('--normalize_a3r', type=str, default='StandardScaler')
     parser.add_argument('--a3r_r', type=int, default=1)
     parser.add_argument('--aggregate', type=str, choices=openmldefaults.experiments.AGGREGATES, default='sum')
-    parser.add_argument('--defaults_sizes', type=int, nargs='+', default=[1, 2, 4, 8, 16, 32, 64])
+    parser.add_argument('--defaults_sizes', type=int, nargs='+', default=[32])
+    parser.add_argument('--n_configurations', type=int, default=32)
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--minimum_evals', type=int, default=128)
     parser.add_argument('--random_seed', type=int, default=1)
@@ -79,6 +80,7 @@ def run(args):
             scoring=args.scoring,
             minimize_measure=args.minimize,
             defaults_sizes=args.defaults_sizes,
+            n_configurations=args.n_configurations,
             aggregate=args.aggregate,
             a3r_r=args.a3r_r,
             normalize_base=args.normalize_base,

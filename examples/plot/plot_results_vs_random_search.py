@@ -10,28 +10,35 @@ import pandas as pd
 def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/grace_experiments/openml-defaults/vanilla_defaults_vs_rs'))
-    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/vanilla_vs_rs'))
+    parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/vanilla_defaults_vs_rs'))
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
+    parser.add_argument('--search_space', type=str, default='adaboost__random_forest__svc')
     parser.add_argument('--n_defaults_in_file', type=int, default=32)
     return parser.parse_args()
 
 
 PERF_MAX = 100.0
-EXPECTED_DATASETS = 10
+EXPECTED_DATASETS = 99
 ALL_BUDGETS = [1, 2, 4, 8, 16, 32]
-EXPECTED_STRATEGIES = ['max_predictive_accuracy', 'random_search_max_predictive_accuracy']
-STRICT_CHECK = True
+EXPECTED_STRATEGIES = [
+    'greedy_max_predictive_accuracy',
+    # 'average_rank_max_predictive_accuracy',
+    'random_search_max_predictive_accuracy',
+]
+STRICT_CHECK = False
 
 
 def run(args):
     pd.options.mode.chained_assignment = 'raise'
     root = logging.getLogger()
     root.setLevel(logging.INFO)
+    logging.info('Started assembling folder %s' % args.results_directory)
 
     folder_constraints = {
+        0: [args.search_space],
         2: EXPECTED_STRATEGIES,
         3: ['%s' % args.n_defaults_in_file],  # ensure string keys
-        4: ['0']
+        4: ['1'],
     }
     folder_legend = {
         'folder_depth_0': 'search_space',
@@ -47,6 +54,7 @@ def run(args):
 
     result_total = None
     for budget in ALL_BUDGETS:
+        logging.info('budget: %s' % budget)
         result_budget, _ = openmldefaults.utils.results_from_folder_to_df(args.results_directory,
                                                                           args.n_defaults_in_file,
                                                                           budget,
@@ -91,7 +99,7 @@ def run(args):
     ax2.set_title("normalized (per task)")
 
     os.makedirs(args.output_directory, exist_ok=True)
-    output_file = os.path.join(args.output_directory, 'results_vs_rs.png')
+    output_file = os.path.join(args.output_directory, 'default_vs_random_search_%s.png' % args.search_space)
     # ax1.set_yscale('log')
     plt.savefig(output_file)
     logging.info('stored figure to %s' % output_file)

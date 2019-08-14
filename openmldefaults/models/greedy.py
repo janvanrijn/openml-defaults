@@ -19,8 +19,7 @@ class GreedyDefaults(DefaultsGenerator):
                              best_score: float,
                              selected_indices: typing.List[int],
                              aggregate: typing.Callable,
-                             minimize: bool):
-        best_addition = None
+                             minimize: bool) -> typing.Tuple[float, int]:
         best_index = None
         for idx, current_config in enumerate(df.index.values):
             per_task_scores = openmldefaults.utils.selected_set_index(df, selected_indices + [idx], minimize)
@@ -29,9 +28,8 @@ class GreedyDefaults(DefaultsGenerator):
                     or (minimize and current_score < best_score) \
                     or ((not minimize) and current_score > best_score):
                 best_score = current_score
-                best_addition = current_config
                 best_index = idx
-        return best_score, best_index, best_addition
+        return best_score, best_index
 
     def generate_defaults_discretized(self, df: pd.DataFrame, num_defaults: int,
                                       minimize: bool, aggregate: typing.Callable,
@@ -85,12 +83,12 @@ class GreedyDefaults(DefaultsGenerator):
         selected_indices = []
         best_score = None
         for itt_defaults in range(num_defaults):
-            best_score, best_index, best_addition = GreedyDefaults.find_best_competitor(df,
-                                                                                        best_score,
-                                                                                        selected_indices,
-                                                                                        aggregate,
-                                                                                        minimize)
-            if best_addition is None:
+            best_score, best_index = GreedyDefaults.find_best_competitor(df,
+                                                                         best_score,
+                                                                         selected_indices,
+                                                                         aggregate,
+                                                                         minimize)
+            if best_index is None:
                 if raise_no_improvement:
                     raise ValueError('Could not add default, as there were no '
                                      'configurations that yield improvement after '
