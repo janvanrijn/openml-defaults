@@ -279,8 +279,8 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                 logging.info('Started measure %s, minimize: %d, n_defaults %d' % (measure, minimize, n_defaults))
                 strategy = '%s_%s_%s' % (model.name, 'min' if minimize else 'max', measure)
                 result_directory = os.path.join(output_directory, classifier_identifier, str(task_id), strategy,
-                                                str(n_defaults), str(random_seed), aggregate, str(a3r_r),
-                                                str(normalize_base), str(normalize_a3r))
+                                                str(n_defaults), str(n_configurations), str(random_seed), aggregate,
+                                                str(a3r_r), str(normalize_base), str(normalize_a3r))
                 os.makedirs(result_directory, exist_ok=True)
                 result_filepath_defaults = os.path.join(result_directory, 'defaults_%d_%d.pkl' % (n_defaults, minimize))
 

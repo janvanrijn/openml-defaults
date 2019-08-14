@@ -38,18 +38,19 @@ def run(args):
         0: [args.search_space],
         2: EXPECTED_STRATEGIES,
         3: ['%s' % args.n_defaults_in_file],  # ensure string keys
-        4: ['1'],
+        5: ['1'],
     }
     folder_legend = {
         'folder_depth_0': 'search_space',
         'folder_depth_1': 'task_id',
         'folder_depth_2': 'strategy',
         'folder_depth_3': 'num_defaults_scheduled',
-        'folder_depth_4': 'random_seed',
-        'folder_depth_5': 'param_aggregate',
-        'folder_depth_6': 'param_a3r_r',
-        'folder_depth_7': 'param_normalize_base',
-        'folder_depth_8': 'param_normalize_a3r',
+        'folder_depth_4': 'n_configurations',
+        'folder_depth_5': 'random_seed',
+        'folder_depth_6': 'param_aggregate',
+        'folder_depth_7': 'param_a3r_r',
+        'folder_depth_8': 'param_normalize_base',
+        'folder_depth_9': 'param_normalize_a3r',
     }
 
     result_total = None
