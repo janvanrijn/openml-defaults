@@ -48,8 +48,8 @@ class TestStrategies(unittest.TestCase):
         for model in models:
             for minimize in {False, True}:
                 logging.info('Testing strategy %s with minimize=%s' % (model.name, minimize))
-                res = model.generate_defaults_discretized(df, 3, minimize, np.sum, self.cs, False)
-                self.assertListEqual(list(res['indices']), expected_results[model.name][minimize])
+                indices, _ = model.generate_defaults_discretized(df, 3, minimize, np.sum, self.cs, False)
+                self.assertListEqual(indices, expected_results[model.name][minimize])
 
     def test_average_rank_on_text_classification(self):
         ground_truth = pd.read_csv('../data/text_classification_ar.csv')
@@ -78,11 +78,19 @@ class TestStrategies(unittest.TestCase):
         ground_truth['classifier'] = 'text_classification'
         tasks_tr = list(metadata_frame[task_id_column].unique())
         frame_tr = openmldefaults.utils.generate_dataset_using_metadata(
-            metadata_frame, tasks_tr, config_space, measures[0], task_id_column, None, None)
+            metadata_frame=metadata_frame,
+            task_ids=tasks_tr,
+            hyperparameter_names=config_space.get_hyperparameter_names(),
+            measure=measures[0],
+            task_id_column=task_id_column,
+            scaler_type=None,
+            column_prefix=None,
+        )
 
         model = openmldefaults.models.AverageRankDefaults()
 
         # accuracy defaults
-        result = model.generate_defaults_discretized(frame_tr, 384, False, sum, config_space, True)
+        indices, _ = model.generate_defaults_discretized(frame_tr, 384, False, sum, config_space, True)
         for idx, row in ground_truth.iterrows():
-            self.assertDictEqual(row.to_dict(), result['defaults'][idx])
+            config = {name: value for name, value in zip(frame_tr.index.names, frame_tr.index[indices[idx]])}
+            self.assertDictEqual(row.to_dict(), config)
