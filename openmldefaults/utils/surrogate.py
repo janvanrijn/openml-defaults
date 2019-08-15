@@ -216,7 +216,7 @@ def generate_dataset_using_surrogates(
         surrogate_columns: np.array,
         task_ids: typing.List[typing.Union[int, str]],
         meta_features: pd.DataFrame,
-        config_sampler: openmldefaults.symbolic.ConfigurationSampler,
+        configurations: typing.List[openmldefaults.symbolic.SymbolicConfiguration],
         n_configurations: int,
         scaler_type: typing.Optional[str],
         column_prefix: typing.Optional[str],
@@ -238,8 +238,8 @@ def generate_dataset_using_surrogates(
     meta_features: pd.DataFrame
         A dataframe with as index a task id and as columns the relevant
         meta-features
-    config_sampler: ConfigurationSampler
-        Used to sample configurations
+    configurations: List[openmldefaults.symbolic.SymbolicConfiguration]
+        Configurations to be included in the dataframe
     n_configurations: int
         The number of configurations to sample (should be higher than the number
         of defaults)
@@ -273,18 +273,14 @@ def generate_dataset_using_surrogates(
         df_ = df_[surrogate_column_order]
         return df_
 
-    configurations = config_sampler.sample_configurations(n_configurations)
     for configuration in configurations:
-        illegal = set(configuration.get_dictionary(None).keys()) - set(config_sampler.get_hyperparameter_names())
+        illegal = set(configuration.get_dictionary(None).keys()) - set(surrogate_columns)
         if len(illegal) > 0:
             raise ValueError('Configuration contains illegal hyper-parameters: %s' % illegal)
 
     df_orig = pd.DataFrame([{'configuration': c} for c in configurations])
 
     for task_id in task_ids:
-        # TODO:
-        # 1) get hyperparameter values
-        # 2) get them in right order (as given by surrogate_columns)
         df_task = pd.DataFrame([c.get_dictionary(meta_features.loc[task_id]) for c in configurations])
         df_task = complete_dataframe(df_task, surrogate_columns)
         surrogate_values = surrogates[task_id].predict(df_task.values)
