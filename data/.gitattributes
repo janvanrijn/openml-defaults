@@ -1,0 +1,8 @@
+classif.glmnet.arff filter=lfs diff=lfs merge=lfs -text
+classif.kerasff.arff filter=lfs diff=lfs merge=lfs -text
+classif.ranger.pow.arff filter=lfs diff=lfs merge=lfs -text
+classif.RcppHNSW.arff filter=lfs diff=lfs merge=lfs -text
+classif.rpart.arff filter=lfs diff=lfs merge=lfs -text
+classif.svm.arff filter=lfs diff=lfs merge=lfs -text
+classif.xgboost.arff filter=lfs diff=lfs merge=lfs -text
+rng_arff.tar.xz filter=lfs diff=lfs merge=lfs -text
