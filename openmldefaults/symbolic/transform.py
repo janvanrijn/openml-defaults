@@ -19,24 +19,28 @@ class InverseTransformer(ABCTransformer):
         if np.isinf(result):
             raise OverflowError()
         return result
+    __call__ = transform
 
 
 class PowerTransformer(ABCTransformer):
     @staticmethod
     def transform(param_value: float, meta_feature_value: float) -> float:
         return param_value ** meta_feature_value
+    __call__ = transform
 
 
 class LogTransformer(ABCTransformer):
     @staticmethod
     def transform(param_value: float, meta_feature_value: float) -> float:
         return param_value * np.log(meta_feature_value)
+    __call__ = transform
 
 
 class RootTransformer(ABCTransformer):
     @staticmethod
     def transform(param_value: float, meta_feature_value: float) -> float:
         return param_value * np.sqrt(meta_feature_value)
+    __call__ = transform
 
 
 def all_transform_fns() -> typing.Dict[str, ABCTransformer]:

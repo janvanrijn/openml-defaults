@@ -1,3 +1,8 @@
+import sys
+sys.path.append('/home/flo/Documents/projects/sklearn-bot')
+sys.path.append('/home/flo/Documents/projects/openml-python-contrib')
+sys.path.append('/home/flo/Documents/projects/openml-defaults')
+
 import arff
 import argparse
 import ConfigSpace
@@ -10,15 +15,21 @@ import pandas as pd
 import pickle
 import sklearn
 import typing
+import openml
+
+import pdb
 
 
 def parse_args():
-    metadata_svc = os.path.expanduser('~/projects/sklearn-bot/data/svc.arff')
-    metadata_qualities = os.path.expanduser('~/projects/openml-python-contrib/data/metafeatures_openml100.arff')
+    # metadata_svc = os.path.expanduser('~/projects/sklearn-bot/data/svc.arff')
+    metadata_svc = os.path.expanduser('~/Documents/projects/sklearn-bot/data/svc.arff')
+    # metadata_qualities = os.path.expanduser('~/projects/openml-python-contrib/data/metafeatures_openml100.arff')
+    # metadata_qualities = os.path.expanduser('~/Documents/projects/openml-python-contrib/data/metafeatures_openml100.arff')
+    metadata_qualities = os.path.expanduser('~/Documents/projects/openml-defaults/data/metafeatures_openml100.arff')
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/')
-    parser.add_argument('--task_idx', type=int, default=None)
+    parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
     parser.add_argument('--search_qualities', type=str, nargs='+')
@@ -104,7 +115,8 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     search_transform_fns = search_transform_fns if search_transform_fns is not None else transform_fns.keys()
     search_hyperparameters = search_hyperparameters if search_hyperparameters is not None \
         else [hp.name for hp in config_space.get_hyperparameters()]
-    
+
+
     symbolic_defaults = list()
     for idx_hp, hyperparameter_name in enumerate(search_hyperparameters):
         hyperparameter = config_space.get_hyperparameter(hyperparameter_name)
@@ -190,7 +202,8 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
 
 def run(args):
-    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
+    # import pdb; pdb.set_trace()
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s', stream=sys.stdout)
 
     config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
                                                                   args.random_seed,
@@ -199,6 +212,8 @@ def run(args):
 
     config_frame_orig = pd.DataFrame(configurations)
     config_frame_orig.sort_index(axis=1, inplace=True)
+
+
 
     with open(args.metadata_qualities_file, 'r') as fp:
         metadata_quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
@@ -243,7 +258,7 @@ def run(args):
 
         estimator, columns = openmldefaults.utils.train_surrogate_on_task(
             task_id,
-            config_space,
+            config_space.get_hyperparameter_names(),
             setup_frame,
             args.scoring,
             normalize=False,

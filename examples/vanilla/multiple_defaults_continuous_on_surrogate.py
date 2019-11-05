@@ -1,3 +1,8 @@
+import sys
+sys.path.append('/home/flo/Documents/projects/sklearn-bot')
+sys.path.append('/home/flo/Documents/projects/openml-python-contrib')
+sys.path.append('/home/flo/Documents/projects/openml-defaults')
+
 import arff
 import argparse
 import logging
@@ -6,6 +11,7 @@ import openmlcontrib
 import openmldefaults
 import os
 import pandas as pd
+import pdb
 
 
 # SSHFS NEMO FREIBURG:
@@ -21,11 +27,13 @@ def parse_args():
     metadata_file_random_forest019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/random_forest.arff')
     metadata_file_svc019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/svc.arff')
     metadata_file_resnet = os.path.expanduser('~/projects/hypeCNN/data/12param/resnet.arff')
+    metadata_files_svm = os.path.expanduser('~/Documents/projects/openml-defaults/data/classif_svm.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults_vs_rs/')
-    parser.add_argument('--task_idx', type=int, default=0)
-    parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_adaboost019, metadata_file_random_forest019, metadata_file_svc019])
+    parser.add_argument('--task_idx', type=int, default=None)
+    # parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_adaboost019, metadata_file_random_forest019, metadata_file_svc019, metadata_files_svm])
+    parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_files_svm])
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--search_space_identifier', type=str, default=None)
     parser.add_argument('--minimize', action='store_true')
@@ -38,7 +46,7 @@ def parse_args():
     parser.add_argument('--n_estimators', type=int, default=64)
     parser.add_argument('--minimum_evals', type=int, default=128)
     parser.add_argument('--random_seed', type=int, default=1)
-    parser.add_argument('--evaluate_on_surrogates', action='store_true')
+    parser.add_argument('--evaluate_on_surrogates', action='store_true', default=True)
     parser.add_argument('--task_limit', type=int, default=None, help='For speed')
     parser.add_argument('--task_id_column', default='task_id', type=str)
     args_ = parser.parse_args()
@@ -46,6 +54,7 @@ def parse_args():
 
 
 def run(args):
+    args = parse_args()
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     task_ids = None

@@ -148,7 +148,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
         raise ValueError('Incompatible experiment parameters.')
     if consider_a3r and runtime_column is None:
         raise ValueError('Can only consider a3r when runtime is also considered.')
-    
+
     logging.info('Starting Default Search Experiment on Task %s' % task_id)
     a3r = 'a3r'
     measures = [scoring]
@@ -195,7 +195,7 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     config_frame_tr = dict()
     config_frame_te = dict()
     measures_normalize = [(scoring, normalize_base)]
-    
+
     if runtime_column:
         measures_normalize.append((runtime_column, normalize_base))
     for measure, normalize in measures_normalize:

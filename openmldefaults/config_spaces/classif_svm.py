@@ -14,7 +14,7 @@ def get_hyperparameter_search_space(seed):
     cs: ConfigSpace.ConfigurationSpace
         The configuration space object
     """
-    cs = ConfigSpace.ConfigurationSpace('mlr.svm', seed)
+    cs = ConfigSpace.ConfigurationSpace('classif_svm', seed)
 
     # fixed to deviance, as exponential requires two classes
     imputer = ConfigSpace.CategoricalHyperparameter(
@@ -23,9 +23,9 @@ def get_hyperparameter_search_space(seed):
     kernel = ConfigSpace.CategoricalHyperparameter(
         name='kernel', choices=['linear', 'polynomial', 'radial'])
     cost = ConfigSpace.hyperparameters.UniformFloatHyperparameter(
-        name='cost', lower=0, upper=4096, log = True)
+        name='cost', lower=10e-10, upper=4096, log = True)
     gamma = ConfigSpace.hyperparameters.UniformFloatHyperparameter(
-        name='gamma', lower=0, upper=4096, log = True)
+        name='gamma', lower=10e-10, upper=4096, log = True)
     degree = ConfigSpace.hyperparameters.UniformIntegerHyperparameter(
         name='degree', lower=2, upper=5)
     tolerance = ConfigSpace.hyperparameters.UniformFloatHyperparameter(

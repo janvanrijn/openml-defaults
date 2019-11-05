@@ -2,6 +2,8 @@ from . import gradient_boosting
 from . import resnet
 from . import svc
 from . import text_classification
+from . import classif_svm
+
 
 import ConfigSpace
 import openmldefaults
