@@ -61,3 +61,29 @@ class VanillaConfigurationSpaceSampler(ConfigurationSampler):
 
     def get_hyperparameter_names(self) -> typing.List[str]:
         return self.configuration_space.get_hyperparameter_names()
+
+
+class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
+
+    def __init__(self, configuration_space: ConfigSpace.ConfigurationSpace, transform_fns: typing.Dict,
+        meta_features: str):
+        self.configuration_space = configuration_space
+        self.transform_fns = transform_fns
+        self.meta_features = meta_features
+
+    def sample_configuration(self) -> SymbolicConfiguration:
+        result = dict()
+        for p, v in self.configuration_space.sample_configuration().get_dictionary().items():
+            transform = random.sample(self.transform_fns, 1)
+            meta_feature = random.sample(self.meta_features, 1)
+            # TODO: This can be made more efficient, if we reject either v or the meta_feature depending
+            #       on the transform.
+            #       Or: We could sample transform so that val, meta_feature map to the config range.
+            result[p] = SymbolicConfigurationValue(v, transform, meta_feature)
+        return SymbolicConfiguration(result)
+
+    def sample_configurations(self, n_configurations: int) -> typing.List[SymbolicConfiguration]:
+        return [self.sample_configuration() for _ in range(n_configurations)]
+
+    def get_hyperparameter_names(self) -> typing.List[str]:
+        return self.configuration_space.get_hyperparameter_names()

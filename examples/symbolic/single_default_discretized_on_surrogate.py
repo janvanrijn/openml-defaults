@@ -17,10 +17,13 @@ import sklearn
 import typing
 import openml
 
-import pdb
-
 
 def parse_args():
+    search_qualities = [#'ClassEntropy', 'DecisionStumpErrRate', 'MajorityClassPercentage', 'PercentageOfInstancesWithMissingValues'
+                        'MajorityClassSize', 'NumberOfClasses', 'NumberOfFeatures',
+                        'NumberOfInstances', 'PercentageOfNumericFeatures',
+                        'PercentageOfSymbolicFeatures']
+
     # metadata_svc = os.path.expanduser('~/projects/sklearn-bot/data/svc.arff')
     metadata_svc = os.path.expanduser('~/Documents/projects/sklearn-bot/data/svc.arff')
     # metadata_qualities = os.path.expanduser('~/projects/openml-python-contrib/data/metafeatures_openml100.arff')
@@ -32,7 +35,7 @@ def parse_args():
     parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
-    parser.add_argument('--search_qualities', type=str, nargs='+')
+    parser.add_argument('--search_qualities', type=str, nargs='+', default=search_qualities)
     parser.add_argument('--search_hyperparameters', type=str, nargs='+')
     parser.add_argument('--search_transform_fns', type=str, nargs='+')
     parser.add_argument('--classifier_name', type=str, default='svc', help='scikit-learn flow name')
@@ -84,6 +87,8 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                  hold_out_task: typing.Optional[int],
                  resized_grid_size: int,
                  output_file: str):
+
+    # Store hold out surrogate
     hold_out_surrogate = None
     if hold_out_task is not None:
         hold_out_surrogate = surrogates[hold_out_task]
@@ -116,7 +121,9 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     search_hyperparameters = search_hyperparameters if search_hyperparameters is not None \
         else [hp.name for hp in config_space.get_hyperparameters()]
 
+    import pdb; pdb.set_trace()
 
+    # Search symbolic hyperparameters
     symbolic_defaults = list()
     for idx_hp, hyperparameter_name in enumerate(search_hyperparameters):
         hyperparameter = config_space.get_hyperparameter(hyperparameter_name)
@@ -188,6 +195,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
                         logging.warning('Overflow error with (fn=%s, alpha=%s, meta_f=%s). '
                                         'skipping. ' % (transform_name, alpha_value, meta_feature))
                         pass
+
     total = {
         'baseline_configuration': baseline_configuration,
         'baseline_avg_performance': baseline_avg_performance,
@@ -202,7 +210,7 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
 
 def run(args):
-    # import pdb; pdb.set_trace()
+
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s', stream=sys.stdout)
 
     config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
@@ -213,11 +221,10 @@ def run(args):
     config_frame_orig = pd.DataFrame(configurations)
     config_frame_orig.sort_index(axis=1, inplace=True)
 
-
-
     with open(args.metadata_qualities_file, 'r') as fp:
         metadata_quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
         metadata_quality_frame = metadata_quality_frame.set_index(['task_id'])
+
     if args.search_qualities is not None:
         if not isinstance(args.search_qualities, list):
             raise ValueError()
@@ -231,6 +238,8 @@ def run(args):
                                                                               [args.scoring],
                                                                               task_id_column=args.task_id_column,
                                                                               skip_row_check=args.skip_row_check)
+
+    metadata_performance_frame.replace(34536.0, 167125.0, inplace=True) # Internet Advertisements id changed
     all_task_ids = metadata_quality_frame.index.unique()
     all_task_ids_perf = set(metadata_performance_frame[args.task_id_column].unique())
     if all_task_ids_perf != set(all_task_ids):
@@ -270,34 +279,36 @@ def run(args):
         surrogates[task_id] = estimator
 
     os.makedirs(os.path.join(args.output_directory, args.classifier_name), exist_ok=True)
-    output_file = os.path.join(args.output_directory, args.classifier_name, 'results_all.pkl')
+
     if args.task_idx is None:
+        task_id = None
         logging.info('Evaluating on train tasks (%d)' % len(all_task_ids))
-        run_on_tasks(config_frame_orig=config_frame_orig,
-                     surrogates=surrogates,
-                     quality_frame=metadata_quality_frame,
-                     config_space=config_space,
-                     search_hyperparameters=args.search_hyperparameters,
-                     search_transform_fns=args.search_transform_fns,
-                     resized_grid_size=args.resized_grid_size,
-                     hold_out_task=None,
-                     output_file=output_file)
+        output_file = os.path.join(args.output_directory, args.classifier_name, 'results_all.pkl')
     else:
         task_id = all_task_ids[args.task_idx]
-        logging.info('Evaluating on holdout task %d (%d/%d)' %
-                     (task_id, args.task_idx + 1, len(all_task_ids)))
+        logging.info('Evaluating on holdout task %d (%d/%d)' % (task_id, args.task_idx + 1, len(all_task_ids)))
         output_file = os.path.join(args.output_directory, args.classifier_name, 'results_%d.pkl' % task_id)
-        run_on_tasks(config_frame_orig=config_frame_orig,
-                     surrogates=surrogates,
-                     quality_frame=metadata_quality_frame,
-                     config_space=config_space,
-                     search_hyperparameters=args.search_hyperparameters,
-                     search_transform_fns=args.search_transform_fns,
-                     resized_grid_size=args.resized_grid_size,
-                     hold_out_task=task_id,
-                     output_file=output_file)
+
+    run_on_tasks(config_frame_orig=config_frame_orig.sample(n = 40),
+                 surrogates=surrogates,
+                 quality_frame=metadata_quality_frame,
+                 config_space=config_space,
+                 search_hyperparameters=args.search_hyperparameters,
+                 search_transform_fns=args.search_transform_fns,
+                 resized_grid_size=args.resized_grid_size,
+                 hold_out_task=task_id,
+                 output_file=output_file)
 
 
 if __name__ == '__main__':
     pd.options.mode.chained_assignment = 'raise'
     run(parse_args())
+
+
+
+# with open("/home/flo/experiments/openml-defaults/symbolic_defaults/svc/results_3.pkl", 'rb') as file:
+#         try:
+#             while True:
+#                data = pickle.load(file)
+#         except EOFError:
+#             pass
