@@ -1,3 +1,4 @@
+import typing
 
 from .transform import ABCTransformer, all_transform_fns
-from .configuration_wrapper import ConfigurationSampler, VanillaConfigurationSpaceSampler, SymbolicConfiguration
+from .configuration_wrapper import SymbolicConfiguration, ConfigurationSampler, VanillaConfigurationSpaceSampler, SymbolicConfigurationSpaceSampler
