@@ -3,6 +3,7 @@ import ConfigSpace
 import typing
 import random
 import numpy as np
+import pickle
 import logging
 
 from openmldefaults.symbolic import ABCTransformer
@@ -81,10 +82,12 @@ class VanillaConfigurationSpaceSampler(ConfigurationSampler):
 class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
 
     def __init__(self, configuration_space: ConfigSpace.ConfigurationSpace,
-        transform_fns: typing.Dict, meta_features: str):
+        transform_fns: typing.Dict, meta_features: str, meta_feature_ranges_file: str):
         self.configuration_space = configuration_space
         self.transform_fns = transform_fns
         self.meta_features = meta_features
+        with open(meta_feature_ranges_file, 'rb') as fp:
+            self.meta_feature_ranges = pickle.load(fp)
 
     def sample_configuration(self) -> SymbolicConfiguration:
         result = dict()
@@ -105,12 +108,17 @@ class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
                      transform.inverse(hyperparameter.upper, meta_feature_value = limits["min"])],
                     [transform.inverse(hyperparameter.lower, meta_feature_value = limits["max"]),
                      transform.inverse(hyperparameter.upper, meta_feature_value = limits["max"])])
-                v = random.choice(np.geomspace(valid_range[0], valid_range[1], 50))
+                if (np.sign(valid_range[0]) == np.sign(valid_range[1])):
+                    v = random.choice(np.geomspace(valid_range[0], valid_range[1], 50))
+                else: v = random.choice(np.linspace(valid_range[0], valid_range[1], 50))
                 # if (valid_range[0] > valid_range[1]):
                 #    logging.warning('No valid alpha found for hyperparameter: %s and transformer %s.' % (hyperparameter.name, transform.__str__()))
                 #    result[p] = SymbolicConfigurationValue(v, None, None)
                 #    continue
-                result[p] = SymbolicConfigurationValue(v, transform, meta_feature)
+                if not np.isnan(v):
+                    result[p] = SymbolicConfigurationValue(v, transform, meta_feature)
+                else:
+                    result[p] = SymbolicConfigurationValue(v, None, None)
             else:
                 result[p] = SymbolicConfigurationValue(v, None, None)
 
@@ -123,7 +131,7 @@ class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
         return self.configuration_space.get_hyperparameter_names()
 
     def get_meta_feature_range(self, name: str) -> typing.Dict:
-        return {"min": 100, "max": 10000}
+        return self.meta_feature_ranges[name]
 
     @staticmethod
     def overlaps(a, b):
