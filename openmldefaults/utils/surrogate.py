@@ -476,6 +476,8 @@ def metadata_files_to_frame(metadata_files: typing.List[str],
     logging.info('Loaded %d meta-data data frames. Dimensions: %s' % (len(metadata_files),
                                                                       str(metadata_frame_total.shape)))
     logging.info('Final Columns: %s' % metadata_frame_classif.columns.values)
+    metadata_frame_total[task_id_column].replace(34536.0, 167125.0, inplace=True) # Internet Advertisements id changed
+
     return metadata_frame_total
 
 

@@ -43,6 +43,8 @@ class PowerTransformer(ABCTransformer):
     def inverse(y: float, meta_feature_value: float) -> float:
         if meta_feature_value == 0.0:
             raise ZeroDivisionError()
+        if y < 0.0: # Produces complex numbers
+            raise ValueError()
         return y ** (1/float(meta_feature_value))
     __call__ = transform
 
@@ -60,6 +62,7 @@ class LogTransformer(ABCTransformer):
         return y / np.log(meta_feature_value)
     __call__ = transform
 
+
 class RootTransformer(ABCTransformer):
     def __str__(self):
         return('log_transformer')
@@ -73,11 +76,14 @@ class RootTransformer(ABCTransformer):
         return y / np.sqrt(meta_feature_value)
     __call__ = transform
 
+
 class ValuePowerTransformer(ABCTransformer):
     def __str__(self):
         return('value_power_transformer')
     @staticmethod
     def transform(param_value: float, meta_feature_value: float) -> float:
+        if meta_feature_value < 0.0 and param_value % 1.0 != 0: # Produces complex numbers
+            raise ValueError()
         return meta_feature_value ** param_value
     @staticmethod
     def inverse(y: float, meta_feature_value: float) -> float:
@@ -87,6 +93,7 @@ class ValuePowerTransformer(ABCTransformer):
             raise ZeroDivisionError()
         return np.log(y) / np.log(meta_feature_value)
     __call__ = transform
+
 
 def all_transform_fns() -> typing.Dict[str, ABCTransformer]:
     transform_fns = {

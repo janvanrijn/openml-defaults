@@ -91,36 +91,39 @@ class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
 
     def sample_configuration(self) -> SymbolicConfiguration:
         result = dict()
-        # For now we only substitute a single symbolic
-        hyperparameter = random.choice(self.configuration_space.get_hyperparameter_names())
-        hyperparameter = self.configuration_space.get_hyperparameter(hyperparameter)
 
-        for p, v in self.configuration_space.sample_configuration().get_dictionary().items():
+        # Ensure we draw a numeric / integer hyperparameter
+        success = None
+        trials = 0
+        while not success and trials < 5:
+            # For now we only substitute a single symbolic
+            hyperparameter = random.choice(self.configuration_space.get_hyperparameter_names())
+            hyperparameter = self.configuration_space.get_hyperparameter(hyperparameter)
+            # Check whether we have a suitable candidate
+            success = not (isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  or\
+                isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant) or\
+                isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter))
+            trials+=1
 
-            if p == hyperparameter.name and \
+        # Draw the config
+        for pn, v in self.configuration_space.sample_configuration().get_dictionary().items():
+            if pn == hyperparameter.name and \
                 not isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  and\
-                not isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant):
+                not isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant) and\
+                not isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter):
                 transform = random.choice(list(self.transform_fns.values()))
                 meta_feature = random.choice(self.meta_features)
-                limits = self.get_meta_feature_range(meta_feature)
-                valid_range = self.overlaps(
-                    [transform.inverse(hyperparameter.lower, meta_feature_value = limits["min"]),
-                     transform.inverse(hyperparameter.upper, meta_feature_value = limits["min"])],
-                    [transform.inverse(hyperparameter.lower, meta_feature_value = limits["max"]),
-                     transform.inverse(hyperparameter.upper, meta_feature_value = limits["max"])])
+
+                valid_range = self.compute_valid_range(hyperparameter, meta_feature, transform)
                 if (np.sign(valid_range[0]) == np.sign(valid_range[1])):
-                    v = random.choice(np.geomspace(valid_range[0], valid_range[1], 50))
-                else: v = random.choice(np.linspace(valid_range[0], valid_range[1], 50))
-                # if (valid_range[0] > valid_range[1]):
-                #    logging.warning('No valid alpha found for hyperparameter: %s and transformer %s.' % (hyperparameter.name, transform.__str__()))
-                #    result[p] = SymbolicConfigurationValue(v, None, None)
-                #    continue
-                if not np.isnan(v):
-                    result[p] = SymbolicConfigurationValue(v, transform, meta_feature)
+                    vnew = random.choice(np.geomspace(valid_range[0], valid_range[1], 50))
+                else: vnew = random.choice(np.linspace(valid_range[0], valid_range[1], 50))
+                if np.isnan(vnew):
+                    result[pn] = SymbolicConfigurationValue(v, None, None) # Simply pass on original v, no transform.
                 else:
-                    result[p] = SymbolicConfigurationValue(v, None, None)
+                    result[pn] = SymbolicConfigurationValue(vnew, transform, meta_feature)
             else:
-                result[p] = SymbolicConfigurationValue(v, None, None)
+                result[pn] = SymbolicConfigurationValue(v, None, None)
 
         return SymbolicConfiguration(result)
 
@@ -132,6 +135,20 @@ class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
 
     def get_meta_feature_range(self, name: str) -> typing.Dict:
         return self.meta_feature_ranges[name]
+
+    def compute_valid_range(self,
+        hyperparameter: ConfigSpace.hyperparameters.Hyperparameter,
+        meta_feature: str,
+        transform: ABCTransformer) -> typing.Any:
+        limits = self.get_meta_feature_range(meta_feature)
+        lst = []
+        for hp, lim in zip([hyperparameter.lower, hyperparameter.upper, hyperparameter.lower, hyperparameter.upper],
+            [limits["min"], limits["min"], limits["max"], limits["max"]]):
+            try:
+                lst.append(transform.inverse(hp, meta_feature_value = lim))
+            except:
+                lst.append(np.nan)
+        return(self.overlaps(lst[:2], lst[2:]))
 
     @staticmethod
     def overlaps(a, b):

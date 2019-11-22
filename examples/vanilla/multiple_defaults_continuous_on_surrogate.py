@@ -21,17 +21,21 @@ import pdb
 # ssh -f -N -L 1233:grace.liacs.nl:22 rijnjnvan@gold.liacs.nl
 # sshfs -p 1233 vanrijn@localhost:/home/vanrijn/experiments ~/grace_experiments
 def parse_args():
+    """
+    Arguments for run():
+    * task_idx: int from {0,1,..., n_tasks-1}: indices of task_ids to process.
+    """
     metadata_file_svc = os.path.expanduser('~/data/openml-defaults/svc.arff')
     metadata_file_gb = os.path.expanduser('~/data/openml-defaults/gradient_boosting.arff')
     metadata_file_adaboost019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/adaboost.arff')
     metadata_file_random_forest019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/random_forest.arff')
     metadata_file_svc019 = os.path.expanduser('~/projects/openml-pimp/KDD2018/data/arff/svc.arff')
     metadata_file_resnet = os.path.expanduser('~/projects/hypeCNN/data/12param/resnet.arff')
-    metadata_files_svm = os.path.expanduser('~/Documents/projects/openml-defaults/data/classif_svm.arff')
+    metadata_files_svm = os.path.expanduser('~/Documents/projects/openml-defaults/data/svc.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults_vs_rs/')
-    parser.add_argument('--task_idx', type=int, default=None)
+    parser.add_argument('--task_idx', type=int, default=0)
     # parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_adaboost019, metadata_file_random_forest019, metadata_file_svc019, metadata_files_svm])
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_files_svm])
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -61,6 +65,8 @@ def run(args):
     for arff_file in args.metadata_files:
         with open(arff_file, 'r') as fp:
             df = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
+            df[args.task_id_column].replace(34536.0, 167125.0, inplace=True) # Internet Advertisements id changed
+
             if task_ids is None:
                 task_ids = np.sort(np.unique(df[args.task_id_column].values))
             else:
