@@ -12,6 +12,7 @@ import openmldefaults
 import os
 import pandas as pd
 import pdb
+import pickle
 
 
 # SSHFS NEMO FREIBURG:
@@ -34,8 +35,8 @@ def parse_args():
     metadata_files_svm = os.path.expanduser('~/Documents/projects/openml-defaults/data/svc.arff')
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
-                        default=os.path.expanduser('~') + '/experiments/openml-defaults/vanilla_defaults_vs_rs/')
-    parser.add_argument('--task_idx', type=int, default=0)
+                        default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults_vs_rs/')
+    parser.add_argument('--task_idx', type=int, default=1)
     # parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_adaboost019, metadata_file_random_forest019, metadata_file_svc019, metadata_files_svm])
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_files_svm])
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
@@ -58,7 +59,6 @@ def parse_args():
 
 
 def run(args):
-    args = parse_args()
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     task_ids = None
@@ -114,4 +114,5 @@ def run(args):
 
 if __name__ == '__main__':
     pd.options.mode.chained_assignment = 'raise'
-    run(parse_args())
+    args = parse_args()
+    run(args)

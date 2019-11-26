@@ -161,11 +161,16 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
     config_space = openmldefaults.config_spaces.get_config_spaces(classifier_names,
                                                                   random_seed,
                                                                   search_space_identifier)
-    configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(config_space)
-    # meta_features = ['NumberOfInstances', 'NumberOfFeatures']
-    # meta_feature_ranges_file = "/home/flo/Documents/projects/openml-defaults/data/metafeatures_ranges.pkl"
-    # tfs = openmldefaults.symbolic.all_transform_fns()
-    # configuration_sampler = openmldefaults.symbolic.SymbolicConfigurationSpaceSampler(config_space, tfs, meta_features, meta_feature_ranges_file)    configurations = configuration_sampler.sample_configurations(n_configurations)
+
+    # configuration_sampler = openmldefaults.symbolic.VanillaConfigurationSpaceSampler(config_space)
+
+    meta_features = ['NumberOfInstances', 'NumberOfFeatures']
+    meta_feature_ranges_file = "/home/flo/Documents/projects/openml-defaults/data/metafeatures_ranges.pkl"
+    tfs = openmldefaults.symbolic.all_transform_fns()
+    configuration_sampler = openmldefaults.symbolic.SymbolicConfigurationSpaceSampler(config_space, tfs, meta_features, meta_feature_ranges_file)
+
+
+    configurations = configuration_sampler.sample_configurations(n_configurations)
     metadata_frame = openmldefaults.utils.metadata_files_to_frame(metadata_files,
                                                                   search_space_identifier,
                                                                   measures,

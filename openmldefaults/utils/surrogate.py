@@ -274,7 +274,7 @@ def generate_dataset_using_surrogates(
         return df_
 
     for configuration in configurations:
-        illegal = set(configuration.get_dictionary(None).keys()) - set(surrogate_columns)
+        illegal = set(configuration.configuration.keys()) - set(surrogate_columns)
         if len(illegal) > 0:
             raise ValueError('Configuration contains illegal hyper-parameters: %s' % illegal)
 

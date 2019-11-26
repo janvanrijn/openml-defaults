@@ -40,12 +40,10 @@ class SymbolicConfiguration(object):
 
     def __init__(self, configuration: typing.Dict[str, SymbolicConfigurationValue]):
         self.configuration = configuration
-
     def get_dictionary(self, meta_features: typing.Optional[typing.Dict[str, float]]) -> typing.Dict[str, typing.Union[str, float, int]]:
         return {
             param: symbolic_val.get_value(meta_features) for param, symbolic_val in self.configuration.items()
         }
-
     def get_repr(self) -> typing.Dict:
         return {
             param: symbolic_val.get_repr() for param, symbolic_val in self.configuration.items()

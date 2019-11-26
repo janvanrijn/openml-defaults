@@ -9,7 +9,7 @@ import pandas as pd
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
-    parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/habanero_experiments/openml-defaults/vanilla_vs_rs'))
+    parser.add_argument('--results_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/vanilla_vs_rs'))
     parser.add_argument('--output_directory', type=str, default=os.path.expanduser('~/experiments/openml-defaults/vanilla_vs_rs'))
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
     parser.add_argument('--n_defaults_in_file', type=int, default=32)
