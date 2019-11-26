@@ -1,8 +1,3 @@
-import sys
-sys.path.append('/home/flo/Documents/projects/sklearn-bot')
-sys.path.append('/home/flo/Documents/projects/openml-python-contrib')
-sys.path.append('/home/flo/Documents/projects/openml-defaults')
-
 import arff
 import argparse
 import ConfigSpace
