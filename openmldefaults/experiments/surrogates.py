@@ -311,9 +311,11 @@ def run_vanilla_surrogates_on_task(task_id: typing.Optional[int],
                     result_defaults = [
                         config_frame_tr[scoring].index[idx].get_dictionary(task_meta_features) for idx in result_indices
                     ]
+                    # Also dump unevaluated (i.e. fully symbolic configs)
+                    configurations_unevaled = [configurations[i] for i in result_indices]
 
                     with open(result_filepath_defaults, 'wb') as fp:
-                        pickle.dump([result_indices, result_defaults, meta_data], fp, protocol=0)
+                        pickle.dump([result_indices, result_defaults, configurations_unevaled, meta_data], fp, protocol=0)
                     logging.info('defaults generated, saved to: %s' % result_filepath_defaults)
 
                 if not task_id:

@@ -31,7 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Creates an ARFF file')
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults_vs_rs/')
-    parser.add_argument('--task_idx', type=int, default=1)
+    parser.add_argument('--task_idx', type=int, default=0)
     # parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_file_adaboost019, metadata_file_random_forest019, metadata_file_svc019, metadata_files_svm])
     parser.add_argument('--metadata_files', type=str, nargs='+', default=[metadata_files_svm])
     parser.add_argument('--scoring', type=str, default='predictive_accuracy')
