@@ -11,7 +11,8 @@ import pickle
 import sklearn
 import typing
 import pdb
-
+import sys
+import logging
 
 def parse_args():
     # metadata_svc = os.path.expanduser('~/projects/sklearn-bot/data/svc.arff')
@@ -22,11 +23,10 @@ def parse_args():
                         'MajorityClassSize', 'NumberOfClasses', 'NumberOfFeatures',
                         'NumberOfInstances', 'PercentageOfInstancesWithMissingValues',
                         'PercentageOfNumericFeatures', 'PercentageOfSymbolicFeatures']
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/multiple/')
-    parser.add_argument('--task_idx', type=int, default=None)
+    parser.add_argument('--task_idx', type=int, default=0)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
     parser.add_argument('--search_qualities', type=str, nargs='+', default = search_qualities)
@@ -201,7 +201,8 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
 def run(args):
     args = parse_args()
-    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
+    logging.info("Starting default calculation")
     config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
                                                                   args.random_seed,
                                                                   args.search_space_identifier)
@@ -242,32 +243,32 @@ def run(args):
 
     # ---- Surrogates ----
     surrogates = dict()
-        for idx, task_id in enumerate(all_task_ids):
-            logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(all_task_ids)))
+    for idx, task_id in enumerate(all_task_ids):
+        logging.info('Training surrogate on Task %d (%d/%d)' % (task_id, idx + 1, len(all_task_ids)))
 
-            setup_frame = pd.DataFrame(metadata_performance_frame.loc[metadata_performance_frame['task_id'] == task_id])
-            del setup_frame['task_id']
-            logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
+        setup_frame = pd.DataFrame(metadata_performance_frame.loc[metadata_performance_frame['task_id'] == task_id])
+        del setup_frame['task_id']
+        logging.info('obtained meta-data from arff file. Dimensions: %s' % str(setup_frame.shape))
 
-            if len(getattr(setup_frame, args.scoring).unique()) == 1:
-                logging.warning('Not enough unique performance measures for task %d. Skipping' % task_id)
-                continue
-            if setup_frame.shape[0] == 0:
-                logging.warning('No results for task %d. Skipping' % task_id)
-                continue
+        if len(getattr(setup_frame, args.scoring).unique()) == 1:
+            logging.warning('Not enough unique performance measures for task %d. Skipping' % task_id)
+            continue
+        if setup_frame.shape[0] == 0:
+            logging.warning('No results for task %d. Skipping' % task_id)
+            continue
 
-            estimator, columns = openmldefaults.utils.train_surrogate_on_task(
-            task_id,
-            config_space.get_hyperparameter_names(),
-            setup_frame,
-            args.scoring,
-            normalize=False,
-            n_estimators=args.n_estimators,
-            random_seed=args.random_seed)
-            if not np.array_equal(config_frame_orig.columns.values, columns):
-                # if this goes wrong, it is due to the pd.get_dummies() fn
-                raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
-            surrogates[task_id] = estimator
+        estimator, columns = openmldefaults.utils.train_surrogate_on_task(
+        task_id,
+        config_space.get_hyperparameter_names(),
+        setup_frame,
+        args.scoring,
+        normalize=False,
+        n_estimators=args.n_estimators,
+        random_seed=args.random_seed)
+        if not np.array_equal(config_frame_orig.columns.values, columns):
+            # if this goes wrong, it is due to the pd.get_dummies() fn
+            raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
+        surrogates[task_id] = estimator
 
 
     # ---- Evaluation ---
@@ -281,16 +282,15 @@ def run(args):
                      (task_id, args.task_idx + 1, len(all_task_ids)))
         output_file = os.path.join(args.output_directory, args.classifier_name, 'results_%d.pkl' % task_id)
 
-        run_on_tasks(config_frame_orig=config_frame_orig,
-                     surrogates=surrogates,
-                     quality_frame=metadata_quality_frame,
-                     config_space=config_space,
-                     search_hyperparameters=args.search_hyperparameters,
-                     search_transform_fns=args.search_transform_fns,
-                     resized_grid_size=args.resized_grid_size,
-                     hold_out_task=task_id,
-                     output_file=output_file)
-    pass
+    run_on_tasks(config_frame_orig=config_frame_orig,
+                    surrogates=surrogates,
+                    quality_frame=metadata_quality_frame,
+                    config_space=config_space,
+                    search_hyperparameters=args.search_hyperparameters,
+                    search_transform_fns=args.search_transform_fns,
+                    resized_grid_size=args.resized_grid_size,
+                    hold_out_task=task_id,
+                    output_file=output_file)
 
 
 if __name__ == '__main__':
