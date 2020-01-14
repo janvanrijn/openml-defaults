@@ -2,7 +2,17 @@ import abc
 import numpy as np
 import typing
 
+"""
+ABCTransformer is the base class for a basic class of transformers that
+takes in
+- param_value (numeric) : A number that ensures that the transformation project into a valid range.
+- meta_feature_value (numeric | int) : The value of the meta_feature.
 
+Additional methods:
+- __str__ for nicer prints
+- inverse: Allows to calculate a range for param_value, such that transform() maps into
+  the valid range of the hyperparameter.
+"""
 class ABCTransformer(abc.ABC):
     def __str__(self):
         return('abc_transformer')
@@ -94,6 +104,16 @@ class ValuePowerTransformer(ABCTransformer):
         return np.log(y) / np.log(meta_feature_value)
     __call__ = transform
 
+class ConstantTransformer(ABCTransformer):
+    def __str__(self):
+        return('constant')
+    @staticmethod
+    def transform(param_value: float, meta_feature_value: float) -> float:
+        return param_value
+    @staticmethod
+    def inverse(y: float, meta_feature_value: float) -> float:
+        return y
+    __call__ = transform
 
 def all_transform_fns() -> typing.Dict[str, ABCTransformer]:
     transform_fns = {
@@ -101,6 +121,7 @@ def all_transform_fns() -> typing.Dict[str, ABCTransformer]:
         'power_transformer': PowerTransformer(),
         'log_transformer': LogTransformer(),
         'root_transformer': RootTransformer(),
-        'value_power_transformer': ValuePowerTransformer()
+        'value_power_transformer': ValuePowerTransformer(),
+        'constant_transformer': ConstantTransformer()
     }
     return transform_fns

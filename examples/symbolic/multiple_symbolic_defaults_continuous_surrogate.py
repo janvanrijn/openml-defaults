@@ -26,7 +26,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_directory', type=str, help='directory to store output',
                         default=os.path.expanduser('~') + '/experiments/openml-defaults/symbolic_defaults/multiple/')
-    parser.add_argument('--task_idx', type=int, default=0)
+    parser.add_argument('--task_idx', type=int, default=None)
     parser.add_argument('--metadata_performance_file', type=str, default=metadata_svc)
     parser.add_argument('--metadata_qualities_file', type=str, default=metadata_qualities)
     parser.add_argument('--search_qualities', type=str, nargs='+', default = search_qualities)
@@ -65,6 +65,7 @@ def select_best_configuration_across_tasks(config_frame: pd.DataFrame,
             raise ValueError('Column set not equal: %s vs %s' % (transformed_frame.columns.values,
                                                                  surrogate_train_cols))
         results[idx] = task_surrogate.predict(transformed_frame.values)
+
     average_measure_per_configuration = np.average(results, axis=0)
     best_idx = np.argmax(average_measure_per_configuration)
     best_config = config_frame.iloc[best_idx]
@@ -88,9 +89,11 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
         del surrogates[hold_out_task]
 
     # performance untransformed
+    # Baseline Avg Performance : Average (in-bag) performance of best config
     baseline_configuration, baseline_results_per_task = select_best_configuration_across_tasks(
         config_frame_orig, surrogates, config_frame_orig.columns.values, None, None, None, None)
     baseline_avg_performance = np.average(baseline_results_per_task)
+
     baseline_holdout = None
     baseline_random_search = None
     if hold_out_task is not None:
@@ -112,7 +115,6 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
     search_transform_fns = search_transform_fns if search_transform_fns is not None else transform_fns.keys()
     search_hyperparameters = search_hyperparameters if search_hyperparameters is not None \
         else [hp.name for hp in config_space.get_hyperparameters()]
-
 
     symbolic_defaults = list()
     for idx_hp, hyperparameter_name in enumerate(search_hyperparameters):
@@ -201,7 +203,10 @@ def run_on_tasks(config_frame_orig: pd.DataFrame,
 
 def run(args):
     args = parse_args()
-    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s',filename='/tmp/myapp.log',filemode='w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    logging.getLogger().addHandler(console)
     logging.info("Starting default calculation")
     config_space = openmldefaults.config_spaces.get_config_spaces([args.classifier_name],
                                                                   args.random_seed,
@@ -210,18 +215,15 @@ def run(args):
     config_frame_orig = pd.DataFrame(configurations)
     config_frame_orig.sort_index(axis=1, inplace=True)
 
-
     # --- Metadata ---
     with open(args.metadata_qualities_file, 'r') as fp:
         metadata_quality_frame = openmlcontrib.meta.arff_to_dataframe(arff.load(fp), None)
         metadata_quality_frame = metadata_quality_frame.set_index(['task_id'])
         metadata_quality_frame.rename(index={'34536':'167125'},inplace=True) # Internet Advertisements was changed on OpenML
-
     if args.search_qualities is not None:
         if not isinstance(args.search_qualities, list):
             raise ValueError()
         metadata_quality_frame = metadata_quality_frame[args.search_qualities]
-
     metadata_atts = openmldefaults.utils.get_dataset_metadata(args.metadata_performance_file)
     if args.scoring not in metadata_atts['col_measures']:
         raise ValueError('Could not find measure: %s' % args.scoring)
@@ -257,14 +259,13 @@ def run(args):
             logging.warning('No results for task %d. Skipping' % task_id)
             continue
 
-        estimator, columns = openmldefaults.utils.train_surrogate_on_task(
-        task_id,
-        config_space.get_hyperparameter_names(),
-        setup_frame,
-        args.scoring,
-        normalize=False,
-        n_estimators=args.n_estimators,
-        random_seed=args.random_seed)
+        estimator, columns = openmldefaults.utils.train_surrogate_on_task(task_id,
+                                                                            config_space.get_hyperparameter_names(),
+                                                                            setup_frame,
+                                                                            args.scoring,
+                                                                            normalize=False,
+                                                                            n_estimators=args.n_estimators,
+                                                                            random_seed=args.random_seed)
         if not np.array_equal(config_frame_orig.columns.values, columns):
             # if this goes wrong, it is due to the pd.get_dummies() fn
             raise ValueError('Column set not equal: %s vs %s' % (config_frame_orig.columns.values, columns))
@@ -276,6 +277,7 @@ def run(args):
         logging.info('Evaluating on train tasks (%d)' % len(all_task_ids))
         task_id = None
         output_file = os.path.join(args.output_directory, args.classifier_name, 'results_all.pkl')
+        # TODO: I think ther might be an error here, I need to iterate over all tasks.
     else:
         task_id = all_task_ids[args.task_idx]
         logging.info('Evaluating on holdout task %d (%d/%d)' %

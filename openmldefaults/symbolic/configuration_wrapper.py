@@ -48,6 +48,9 @@ class SymbolicConfiguration(object):
         return {
             param: symbolic_val.get_repr() for param, symbolic_val in self.configuration.items()
         }
+    def update_hyperparameter(self, hyperparameter_name: str, new_val: SymbolicConfigurationValue):
+        self.configuration[hyperparameter_name] = new_val
+
 
 
 class ConfigurationSampler(abc.ABC):
@@ -80,50 +83,73 @@ class VanillaConfigurationSpaceSampler(ConfigurationSampler):
 class SymbolicConfigurationSpaceSampler(ConfigurationSampler):
 
     def __init__(self, configuration_space: ConfigSpace.ConfigurationSpace,
-        transform_fns: typing.Dict, meta_features: str, meta_feature_ranges_file: str):
+        transform_fns: typing.Dict, meta_features: str, meta_feature_ranges_file: str,
+        hyperparameter_name: str=None,
+        candidate_configuration: SymbolicConfiguration=None,
+        resolution: int=50):
         self.configuration_space = configuration_space
         self.transform_fns = transform_fns
         self.meta_features = meta_features
+        if (hyperparameter_name not in configuration_space.get_hyperparameter_names()):
+            raise ValueError('Hyperparameter: %s needs to be in config_space' % (hyperparameter_name))
+        else: self.hyperparameter_name = hyperparameter_name
+        self.candidate_configuration = candidate_configuration
+        self.resolution = resolution
         with open(meta_feature_ranges_file, 'rb') as fp:
             self.meta_feature_ranges = pickle.load(fp)
+
+    def sample_symbolic_configuration_value(self, hyperparameter, v):
+        transform = random.choice(list(self.transform_fns.values()))
+        meta_feature = random.choice(self.meta_features)
+        valid_range = self.compute_valid_range(hyperparameter, meta_feature, transform)
+        if (np.sign(valid_range[0]) == np.sign(valid_range[1])):
+            vnew = random.choice(np.geomspace(valid_range[0], valid_range[1], self.resolution))
+        else: vnew = random.choice(np.linspace(valid_range[0], valid_range[1], self.resolution))
+        if np.isnan(vnew):
+            return(SymbolicConfigurationValue(v, None, None)) # Simply pass on original v, no transform.
+        else:
+            return(SymbolicConfigurationValue(vnew, transform, meta_feature))
 
     def sample_configuration(self) -> SymbolicConfiguration:
         result = dict()
 
-        # Ensure we draw a numeric / integer hyperparameter
-        success = None
-        trials = 0
-        while not success and trials < 5:
-            # For now we only substitute a single symbolic
-            hyperparameter = random.choice(self.configuration_space.get_hyperparameter_names())
-            hyperparameter = self.configuration_space.get_hyperparameter(hyperparameter)
-            # Check whether we have a suitable candidate
-            success = not (isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  or\
+        if self.hyperparameter_name is not None:
+            hyperparameter = self.configuration_space.get_hyperparameter(self.hyperparameter_name)
+
+            if (isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  or\
                 isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant) or\
-                isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter))
-            trials+=1
+                isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter)):
+                raise ValueError('Hyperparameter: %s needs to be integer or numeric' % (self.hyperparameter_name))
+        else:
+            # Ensure we draw a numeric / integer hyperparameter
+            success = None
+            trials = 0
+            while not success and trials < 5:
+                # For now we only substitute a single symbolic
+                hyperparameter = random.choice(self.configuration_space.get_hyperparameter_names())
+                hyperparameter = self.configuration_space.get_hyperparameter(hyperparameter)
+                # Check whether we have a suitable candidate
+                success = not (isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  or\
+                    isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant) or\
+                    isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter))
+                trials+=1
 
-        # Draw the config
-        for pn, v in self.configuration_space.sample_configuration().get_dictionary().items():
-            if pn == hyperparameter.name and \
-                not isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  and\
-                not isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant) and\
-                not isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter):
-                transform = random.choice(list(self.transform_fns.values()))
-                meta_feature = random.choice(self.meta_features)
-
-                valid_range = self.compute_valid_range(hyperparameter, meta_feature, transform)
-                if (np.sign(valid_range[0]) == np.sign(valid_range[1])):
-                    vnew = random.choice(np.geomspace(valid_range[0], valid_range[1], 50))
-                else: vnew = random.choice(np.linspace(valid_range[0], valid_range[1], 50))
-                if np.isnan(vnew):
-                    result[pn] = SymbolicConfigurationValue(v, None, None) # Simply pass on original v, no transform.
+        if self.candidate_configuration is None:
+            # Draw the config
+            for pn, v in self.configuration_space.sample_configuration().get_dictionary().items():
+                if pn == hyperparameter.name and \
+                    not isinstance(hyperparameter, ConfigSpace.hyperparameters.UnParametrizedHyperparameter)  and\
+                    not isinstance(hyperparameter, ConfigSpace.hyperparameters.Constant) and\
+                    not isinstance(hyperparameter, ConfigSpace.hyperparameters.CategoricalHyperparameter):
+                    result[pn] = self.sample_symbolic_configuration_value(hyperparameter, v)
                 else:
-                    result[pn] = SymbolicConfigurationValue(vnew, transform, meta_feature)
-            else:
-                result[pn] = SymbolicConfigurationValue(v, None, None)
-
-        return SymbolicConfiguration(result)
+                    result[pn] = SymbolicConfigurationValue(v, None, None)
+            return SymbolicConfiguration(result)
+        else:
+            v = self.configuration_space.sample_configuration().get(hyperparameter.name)
+            symbolic_value = self.sample_symbolic_configuration_value(hyperparameter, v)
+            self.candidate_configuration.update_hyperparameter(hyperparameter.name, symbolic_value)
+            return(self.candidate_configuration)
 
     def sample_configurations(self, n_configurations: int) -> typing.List[SymbolicConfiguration]:
         return [self.sample_configuration() for _ in range(n_configurations)]
