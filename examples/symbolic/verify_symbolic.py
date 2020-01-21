@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     candidate = None
     best_score = 10e3
-    for i in range(10000):
+    for i in range(1000):
         for hyp in ['h1', 'h2', 'h3']:
             scs = openmldefaults.symbolic.SymbolicConfigurationSpaceSampler(cs,
                 transform_fns,
