@@ -15,7 +15,7 @@ def get_hyperparameter_search_space(seed):
     cs: ConfigSpace.ConfigurationSpace
         The configuration space object
     """
-    cs = ConfigSpace.ConfigurationSpace('mlr.xgboost', seed)
+    cs = ConfigSpace.ConfigurationSpace('classif_xgboost', seed)
 
     imputer = ConfigSpace.CategoricalHyperparameter(
         name='num.impute.selected.cpo', choices=['impute.hist', 'impute.median', 'impute.mean'], default_value='impute.hist')

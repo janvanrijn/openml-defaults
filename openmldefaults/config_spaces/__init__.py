@@ -3,6 +3,7 @@ from . import resnet
 from . import svc
 from . import text_classification
 from . import classif_svm
+from . import classif_xgboost
 
 
 import ConfigSpace

@@ -1,5 +1,6 @@
 from deap import tools
 from sympy import simplify
+import numpy as np
 
 def register_stats():
     # Statistics

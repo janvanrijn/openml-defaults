@@ -1,9 +1,12 @@
 import operator
 import math
+import random
 import numpy as np
+from deap import gp
 
 def register_pset():
     np.seterr(all='raise')
+
     def protectedDiv(left, right):
         try:
             return np.divide(left, right)
@@ -34,6 +37,16 @@ def register_pset():
         x = np.sqrt(x)
         return(x)
 
+    def log_abs(x):
+        if (x < 0):
+            x = abs(x)
+        try:
+            if (x == 0):
+                raise ValueError
+            return(np.log(x))
+        except:
+            return(1)
+
     # Operations
     pset = gp.PrimitiveSet("MAIN", 1)
     pset.addPrimitive(operator.add, 2)
@@ -41,8 +54,9 @@ def register_pset():
     pset.addPrimitive(operator.mul, 2)
     pset.addPrimitive(protectedDiv, 2, name = "div")
     pset.addPrimitive(operator.neg, 1)
+    # sqrt and log are only def'd for x > 0
     pset.addPrimitive(sqrt_abs, 1, name = "sqrt")
-    # pset.addPrimitive(log, 1, name = "log")
+    pset.addPrimitive(log_abs, 1, name = "log")
     pset.addPrimitive(protectedPow, 2, name = "pow")
     pset.addEphemeralConstant("rand01", lambda: random.uniform(0,1))
     pset.addEphemeralConstant("int010", lambda: random.randint(1, 10))
