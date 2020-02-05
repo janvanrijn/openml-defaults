@@ -1,6 +1,8 @@
 import copy
 import warnings
 import operator
+import math
+import random
 from functools import partial, wraps, partialmethod
 
 import deap.gp
@@ -30,7 +32,7 @@ def make_pset(meta_features:list=["n", "p"]):
 
     :return: Returns a set of primitives [deap.gp.PrimitiveSet]
     """
-    pset = gp.numpy_primitive_set(arity=0, categories=["algebraic"])
+    pset = gp.numpy_primitive_set(arity=0, categories=["algebraic", "exponential", "sqrt"])
     pset.terminals[object].append(Terminal("const"))
     for ft in meta_features:
         pset.terminals[object].append(Terminal(ft))
@@ -94,7 +96,7 @@ def phenotype(individual):
 
 # ------ 1-D Individual ---------------------------------------------------------
 class Individual(gp.individual.AExpressionTree):
-    """The gp representation (genotype) of the formula"""
+    """The gp representation (genotype) of the formula for a single hyperpar"""
     pset = make_pset()
     name = "1-D formula"
     @property
@@ -109,24 +111,37 @@ class Individual(gp.individual.AExpressionTree):
 
 # ------ N-D Individual ---------------------------------------------------------
 class NDIndividual(gp.individual.ANDimTree):
-    """The gp representation (genotype) of a N-Dimensional formula"""
+    """
+    The gp representation (genotype) of a N-Dimensional formula, i.e.
+    a full configuration.
+    """
     base = Individual
     name = "N-D formula"
     @property
     def n_consts(self):
-        return sum([self[i].n_consts for i in range(self.height)])
+        return sum([i.n_consts for i in self])
     @property
     def n_args(self):
-        return sum([self[i].n_args for i in range(self.height)])
+        return sum([i.n_args for i in self])
     @property
     def arity(self):
-        return sum([self[i].arity for i in range(self.height)])
+        return sum([i.arity for i in self])
     @property
     def pset(self):
         return self[0].pset
-
+    @property
+    def height(self):
+        return sum([i.height for i in self])
 
 def const_opt(f, individual, mfargs):
+    """
+    Optimize constants in the formula:
+    Each constant 'c' in the formula is optimized using scipy.optimize
+
+    :param f: function to optimize
+    :param individual: genotype of an NDIndividual
+    :param mfargs: meta-features
+    """
     arity = individual.arity
     f = partial(f, **mfargs)
 
@@ -154,10 +169,17 @@ def const_opt(f, individual, mfargs):
         popt = np.array([])
     return popt, measure_opt
 
-
+@silent_numpy
 def surrogate_prd(x):
-    return (x[0] - 10)**2 + (x[1]+3)**2
-
+    """
+    Objective test function:
+    minimal for [n**2, -3] (assuming n = 10)
+    """
+    out = (np.sqrt(x[0]) - 10)**2 + (x[1]+3)**2
+    if math.isnan(out):
+        return 10e3
+    else:
+        return out
 
 @silent_numpy
 def error(ind, **args):
@@ -179,6 +201,18 @@ def update_fitness(population, mfargs, map=map):
         ind.fitness.values = fit
     return population
 
+def random_mutation_operator(individual, expr, pset):
+    '''
+        Randomly picks a replacement, insert, mutEphemeral or shrink mutation.
+    '''
+    roll = random.random()
+    if roll <= 0.4:
+        return deap.gp.mutUniform(individual, expr=expr, pset=pset)
+    elif roll <= 0.7:
+        return deap.gp.mutInsert(individual, pset=pset)
+    else:
+        return deap.gp.mutShrink(individual)
+
 if __name__ == "__main__":
     pop_size = 50
     meta_features = ["n", "p"]
@@ -187,13 +221,13 @@ if __name__ == "__main__":
     mf = {"n":10, "p":5}
 
     # Koza-style tree depth limits.
-    limit = static_limit(key=operator.attrgetter("height"), max_value=12)
+    limit = static_limit(key=operator.attrgetter("height"), max_value=4*problem_dimension)
     # Mutations + Adaption to N-D Problems
     mate = limit(deap.gp.cxOnePoint)
     mate =   partial(nd_crossover, cx1d=mate)
-    mutate = limit(partial(deap.gp.mutUniform, expr=partial(deap.gp.genFull, min_=0, max_=2), pset=Individual.pset))
+    mutate = limit(partial(random_mutation_operator, expr=partial(deap.gp.genHalfAndHalf, min_=0, max_=2), pset=Individual.pset))
     mutate = partial(nd_mutation, mut1d=mutate)
-    select = partial(deap.tools.selDoubleTournament, fitness_size=10, parsimony_size=1.6, fitness_first=True)
+    select = partial(deap.tools.selDoubleTournament, fitness_size=25, parsimony_size=1.6, fitness_first=True)
     NDIndividual.create_population = partial(NDIndividual.create_population, ndim = problem_dimension)
 
     algorithm = gp.algorithms.AgeFitness(
