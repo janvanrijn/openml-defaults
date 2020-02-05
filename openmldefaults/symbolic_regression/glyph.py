@@ -11,6 +11,7 @@ import scipy.optimize
 from glyph import gp
 from glyph.utils import Memoize
 from glyph.utils.numeric import nrmse, silent_numpy
+from glyph.gp.breeding import nd_crossover, nd_mutation
 import pdb
 
 class Terminal(deap.gp.Terminal):
@@ -61,15 +62,28 @@ def phenotype(individual):
         Separates out constants, i.e. "const + const" -> "c1 + c2"
         for individual optimization using `scipy.optimize.minimize`.
 
+        This builds a lambda function of the format
+        lambda a,b,c0,c1: [Add(a, c0), Add(a,b)]
+
+        where c0, c1 are constants to be optimized
+        and   a , b  are meta-feature constants.
+        The function returns a list of length *ndim*.
+
         :param individual: [AExpressionTree] Individual to be converted.
 
-        :return: Function to be optimized,
+        :return: Function to be optimized.
+
     """
-    iargs = ""
+    # String of args to the lambda function:
     if (individual.n_consts > 0):
-        iargs = iargs+",".join("c{i}".format(i=i) for i in range(individual.n_consts))
+        iargs = ",".join("c{i}".format(i=i) for i in range(individual.n_consts))
     if (len(individual.pset.meta_features) > 0):
-        iargs = ",".join([iargs, ",".join(mf for mf in individual.pset.meta_features)])
+        mfargs = ",".join(mf for mf in individual.pset.meta_features)
+        if (individual.n_consts > 0):
+            iargs = ",".join([iargs, mfargs])
+        else:
+            iargs = mfargs
+    # Build up the lambda function and evaluate it
     code = repr(individual)
     for i in range(individual.n_consts):
        code = code.replace("const", "c{i}".format(i=i), 1)
@@ -112,29 +126,37 @@ class NDIndividual(gp.individual.ANDimTree):
         return self[0].pset
 
 
-def const_opt(f, individual, meta_features={"n":10,"p":4}):
+def const_opt(f, individual, mfargs):
     arity = individual.arity
-    f = partial(f, **meta_features)
+    f = partial(f, **mfargs)
 
     @wraps(f)
     def closure(consts):
-        consts = dict([("c"+"{i}".format(i = k), v) for k,v in enumerate(consts)])
-        params = f(individual, **consts)
+        if consts is not None:
+            consts = dict([("c"+"{i}".format(i = k), v) for k,v in enumerate(consts)])
+            params = f(individual, **consts)
+        else:
+            params = f(individual)
         return surrogate_prd(params)
 
-    p0 = np.ones(individual.n_consts)
-    res = scipy.optimize.minimize(fun=closure, x0=p0, method="Nelder-Mead", tol=1e-2, options={"maxiter":30})
-    popt = res.x if res.x.shape else np.array([res.x])
-    measure_opt = res.fun
-    if not res.success:
-        warnings.warn(res.message, UserWarning)
-    if measure_opt is None:
-        measure_opt = closure(popt)
+
+    if (individual.n_consts > 0):
+        p0 = np.ones(individual.n_consts)
+        res = scipy.optimize.minimize(fun=closure, x0=p0, method="Nelder-Mead", tol=1e-2, options={"maxiter":30})
+        popt = res.x if res.x.shape else np.array([res.x])
+        measure_opt = res.fun
+        if not res.success:
+            warnings.warn(res.message, UserWarning)
+        if measure_opt is None:
+            measure_opt = closure(popt)
+    else:
+        measure_opt = closure(None)
+        popt = np.array([])
     return popt, measure_opt
 
 
 def surrogate_prd(x):
-    return x[0] - 10 + x[1]+3
+    return (x[0] - 10)**2 + (x[1]+3)**2
 
 
 @silent_numpy
@@ -143,44 +165,50 @@ def error(ind, **args):
     return f(**args)
 
 @Memoize
-def measure(ind):
-    popt, err_opt = const_opt(error, ind)
+def measure(ind, mfargs):
+    popt, err_opt = const_opt(f=error, individual=ind, mfargs=mfargs)
     ind.popt = popt
-    return err_opt, len(ind)
+    ind_len = sum([len(x) for x in ind])
+    return err_opt, ind_len
 
 
-def update_fitness(population, map=map):
+def update_fitness(population, mfargs, map=map):
     invalid = [p for p in population if not p.fitness.valid]
-    fitnesses = map(measure, invalid)
+    fitnesses = map(partial(measure, mfargs=mfargs), invalid)
     for ind, fit in zip(invalid, fitnesses):
         ind.fitness.values = fit
     return population
 
 if __name__ == "__main__":
-    pop_size = 20
+    pop_size = 50
+    meta_features = ["n", "p"]
+    pset = make_pset(meta_features)
+    problem_dimension = 2
+    mf = {"n":10, "p":5}
+
     # Koza-style tree depth limits.
     limit = static_limit(key=operator.attrgetter("height"), max_value=12)
-
-    # Mutations
+    # Mutations + Adaption to N-D Problems
     mate = limit(deap.gp.cxOnePoint)
-    expr_mut = partial(deap.gp.genFull, min_=0, max_=2)
-    mutate =   limit(partial(deap.gp.mutUniform, expr=expr_mut, pset=Individual.pset))
-    select =   partial(deap.tools.selDoubleTournament, fitness_size=10, parsimony_size=1.6, fitness_first=True)
+    mate =   partial(nd_crossover, cx1d=mate)
+    mutate = limit(partial(deap.gp.mutUniform, expr=partial(deap.gp.genFull, min_=0, max_=2), pset=Individual.pset))
+    mutate = partial(nd_mutation, mut1d=mutate)
+    select = partial(deap.tools.selDoubleTournament, fitness_size=10, parsimony_size=1.6, fitness_first=True)
+    NDIndividual.create_population = partial(NDIndividual.create_population, ndim = problem_dimension)
 
     algorithm = gp.algorithms.AgeFitness(
         mate, mutate, select, NDIndividual.create_population
     )
+    pop = update_fitness(NDIndividual.create_population(pop_size), mfargs=mf)
 
-    pop = update_fitness(NDIndividual.create_population(pop_size, 2))
-
-    for gen in range(20):
+    for gen in range(50):
         pop = algorithm.evolve(pop)
-        pop = update_fitness(pop)
+        pop = update_fitness(pop, mfargs=mf)
         best = deap.tools.selBest(pop, 1)[0]
 
         print(best, best.popt, best.fitness.values)
 
-        if best.fitness.values[0] <= 1e-3:
+        if best.fitness.values[0] <= 1e-8:
             break
 
 
