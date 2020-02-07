@@ -46,7 +46,6 @@ def static_limit(key, max_value):
     :param max_value: Maximum depth of the expression tree.
     :return: Wrapped function
     """
-
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -132,6 +131,10 @@ class NDIndividual(gp.individual.ANDimTree):
     @property
     def height(self):
         return sum([i.height for i in self])
+    @property
+    def max_height(self):
+        return max([i.height for i in self])
+
 
 def const_opt(f, individual, mfargs):
     """
@@ -153,7 +156,6 @@ def const_opt(f, individual, mfargs):
         else:
             params = f(individual)
         return surrogate_prd(params)
-
 
     if (individual.n_consts > 0):
         p0 = np.ones(individual.n_consts)
@@ -183,11 +185,17 @@ def surrogate_prd(x):
 
 @silent_numpy
 def error(ind, **args):
+    """
+    Error function to optimize, translates to phenotype and evaluates it
+    """
     f = phenotype(ind)
     return f(**args)
 
 @Memoize
 def measure(ind, mfargs):
+     """
+    Evaluate an individual, wrapped with optimization of constants.
+    """
     popt, err_opt = const_opt(f=error, individual=ind, mfargs=mfargs)
     ind.popt = popt
     ind_len = sum([len(x) for x in ind])
@@ -203,31 +211,32 @@ def update_fitness(population, mfargs, map=map):
 
 def random_mutation_operator(individual, expr, pset):
     '''
-        Randomly picks a replacement, insert, mutEphemeral or shrink mutation.
+        Randomly picks a mutation with different probabilities.
     '''
     roll = random.random()
-    if roll <= 0.4:
+    if roll <= 0.3:
         return deap.gp.mutUniform(individual, expr=expr, pset=pset)
-    elif roll <= 0.7:
-        return deap.gp.mutInsert(individual, pset=pset)
+    elif roll <= 0.6:
+        return deap.gp.mutNodeReplacement(individual, pset=pset)
     else:
         return deap.gp.mutShrink(individual)
 
+
 if __name__ == "__main__":
-    pop_size = 50
+    pop_size = 49
     meta_features = ["n", "p"]
     pset = make_pset(meta_features)
     problem_dimension = 2
     mf = {"n":10, "p":5}
 
     # Koza-style tree depth limits.
-    limit = static_limit(key=operator.attrgetter("height"), max_value=4*problem_dimension)
-    # Mutations + Adaption to N-D Problems
-    mate = limit(deap.gp.cxOnePoint)
+    limit = static_limit(key=operator.attrgetter("height"), max_value=8)
+    # Mutations + Adaption to N-D Problems (permutes only one hyperpar at a time)
+    mate = limit(partial(deap.gp.cxOnePointLeafBiased, termpb = 0.2))
     mate =   partial(nd_crossover, cx1d=mate)
-    mutate = limit(partial(random_mutation_operator, expr=partial(deap.gp.genHalfAndHalf, min_=0, max_=2), pset=Individual.pset))
+    mutate = limit(partial(random_mutation_operator, expr=partial(deap.gp.genHalfAndHalf, min_=0, max_=3), pset=Individual.pset))
     mutate = partial(nd_mutation, mut1d=mutate)
-    select = partial(deap.tools.selDoubleTournament, fitness_size=25, parsimony_size=1.6, fitness_first=True)
+    select = partial(deap.tools.selDoubleTournament, fitness_size=7, parsimony_size=1.6, fitness_first=True)
     NDIndividual.create_population = partial(NDIndividual.create_population, ndim = problem_dimension)
 
     algorithm = gp.algorithms.AgeFitness(
